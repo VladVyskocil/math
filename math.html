@@ -1,0 +1,769 @@
+
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procvičování násobilky a dělení</title>
+    <style>
+        body {
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f8ff;
+            text-align: center;
+        }
+        .container {
+            background-color: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            color: #2c80b9;
+            font-size: 28px;
+        }
+        .problem {
+            font-size: 32px;
+            margin: 30px 0;
+            color: #333;
+        }
+        input[type="number"] {
+            font-size: 24px;
+            width: 80px;
+            padding: 10px;
+            border: 2px solid #2c80b9;
+            border-radius: 10px;
+            text-align: center;
+        }
+        button {
+            font-size: 20px;
+            padding: 10px 20px;
+            background-color: #2c80b9;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #1a6ea8;
+        }
+        .score {
+            font-size: 24px;
+            margin: 20px 0;
+            color: #2c80b9;
+        }
+        .feedback {
+            font-size: 24px;
+            margin: 20px 0;
+            min-height: 30px;
+        }
+        .correct {
+            color: green;
+        }
+        .incorrect {
+            color: red;
+        }
+        .result-container {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #e9f7ff;
+            border-radius: 15px;
+            animation: fadeIn 1s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .stars {
+            font-size: 50px;
+            color: gold;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+            margin: 20px 0;
+        }
+        .progress-container {
+            margin: 20px auto;
+            width: 80%;
+            height: 20px;
+            background-color: #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #2c80b9;
+            transition: width 0.5s;
+        }
+        .celebration {
+            position: absolute;
+            font-size: 30px;
+            animation: fallDown 2s forwards;
+            opacity: 0;
+        }
+        @keyframes fallDown {
+            0% {
+                transform: translateY(-50px);
+                opacity: 1;
+            }
+            80% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100px);
+                opacity: 0;
+            }
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .stat-item {
+            background-color: #e9f7ff;
+            padding: 10px;
+            border-radius: 10px;
+            width: 45%;
+            margin: 5px;
+        }
+        .mode-selection {
+            text-align: center;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .mode-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .mode-btn {
+            font-size: 18px;
+            padding: 15px;
+            background-color: #4c9aff;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        .mode-btn:hover {
+            background-color: #3a7bd5;
+            transform: scale(1.02);
+        }
+        .focus-option {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e9f7ff;
+            border-radius: 10px;
+        }
+        .focus-buttons {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .focus-btn {
+            font-size: 16px;
+            padding: 10px 15px;
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .focus-btn:hover {
+            background-color: #4cae4c;
+        }
+        .focus-btn.active {
+            background-color: #f0ad4e;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Procvičování násobilky a dělení</h1>
+        
+        <div id="mode-selection" class="mode-selection">
+            <h1>Procvičování matematiky</h1>
+            <h2>Vyber si typ příkladů:</h2>
+            
+            <div class="mode-options">
+                <button class="mode-btn" data-mode="1">Násobilka a dělení (1-5 a 10)</button>
+                <button class="mode-btn" data-mode="2">Násobilka a dělení (1-6 a 10)</button>
+                <button class="mode-btn" data-mode="3">Násobilka a dělení (1-7 a 10)</button>
+                <button class="mode-btn" data-mode="4">Násobilka a dělení (1-8 a 10)</button>
+                <button class="mode-btn" data-mode="5">Násobilka a dělení (1-9 a 10)</button>
+                <button class="mode-btn" data-mode="6">Sčítání a odčítání do 100</button>
+            </div>
+            
+            <div id="focus-option" class="focus-option" style="display: none;">
+                <h3>Chceš procvičovat jen konkrétní číslo?</h3>
+                <div id="focus-buttons" class="focus-buttons">
+                    <!-- Tlačítka se generují dynamicky podle výběru režimu -->
+                </div>
+                <button id="focus-all-btn" class="focus-btn">Procvičovat všechna čísla</button>
+            </div>
+        </div>
+        
+        <div id="game-screen" style="display: none;">
+            <div class="score">Body: <span id="score">0</span></div>
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <div class="success-rate">Úspěšnost: <span id="current-success-rate">0%</span></div>
+            <div class="problem" id="problem"></div>
+            <input type="number" id="answer" placeholder="?" min="0" max="100">
+            <div>
+                <button id="check-btn">Zkontrolovat</button>
+            </div>
+            <div class="feedback" id="feedback"></div>
+        </div>
+        
+        <div id="result-screen" class="result-container">
+            <h2>Gratuluji! Dosáhl/a jsi 50 bodů!</h2>
+            <div class="stars">⭐⭐⭐⭐⭐</div>
+            <div class="stats">
+                <div class="stat-item">
+                    <h3>Správné odpovědi</h3>
+                    <div id="correct-count">0</div>
+                </div>
+                <div class="stat-item">
+                    <h3>Špatné odpovědi</h3>
+                    <div id="incorrect-count">0</div>
+                </div>
+                <div class="stat-item">
+                    <h3>Celkový čas</h3>
+                    <div id="total-time">0:00</div>
+                </div>
+                <div class="stat-item">
+                    <h3>Úspěšnost</h3>
+                    <div id="success-rate">0%</div>
+                </div>
+            </div>
+            <button id="restart-btn">Hrát znovu</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const modeSelection = document.getElementById('mode-selection');
+            const focusOption = document.getElementById('focus-option');
+            const focusButtons = document.getElementById('focus-buttons');
+            const focusAllBtn = document.getElementById('focus-all-btn');
+            const gameScreen = document.getElementById('game-screen');
+            const problemElement = document.getElementById('problem');
+            const answerInput = document.getElementById('answer');
+            const checkButton = document.getElementById('check-btn');
+            const feedbackElement = document.getElementById('feedback');
+            const scoreElement = document.getElementById('score');
+            const progressBar = document.getElementById('progress-bar');
+            const resultScreen = document.getElementById('result-screen');
+            const restartButton = document.getElementById('restart-btn');
+            const correctCountElement = document.getElementById('correct-count');
+            const incorrectCountElement = document.getElementById('incorrect-count');
+            const totalTimeElement = document.getElementById('total-time');
+            
+            // Inicializace Web Audio API
+            let audioContext;
+            
+            // Proměnné pro typy testů
+            let currentMode = 1;
+            let focusNumber = null;
+            let numbers = [1, 2, 3, 4, 5, 10]; // Výchozí čísla pro režim 1
+            
+            // Konfigurace režimů
+            const modes = {
+                1: { numbers: [1, 2, 3, 4, 5, 10], name: "Násobilka a dělení (1-5 a 10)" },
+                2: { numbers: [1, 2, 3, 4, 5, 6, 10], name: "Násobilka a dělení (1-6 a 10)", focus: 6 },
+                3: { numbers: [1, 2, 3, 4, 5, 6, 7, 10], name: "Násobilka a dělení (1-7 a 10)", focus: 7 },
+                4: { numbers: [1, 2, 3, 4, 5, 6, 7, 8, 10], name: "Násobilka a dělení (1-8 a 10)", focus: 8 },
+                5: { numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], name: "Násobilka a dělení (1-9 a 10)", focus: 9 },
+                6: { name: "Sčítání a odčítání do 100" }
+            };
+            
+            // Inicializace Audio Context při první interakci uživatele
+            function initAudio() {
+                if (!audioContext) {
+                    try {
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    } catch (e) {
+                        console.log('Web Audio API není podporováno v tomto prohlížeči.');
+                    }
+                }
+            }
+            
+            // Funkce pro přehrání zvuků
+            function playCorrectSound() {
+                if (!audioContext) return;
+                
+                // Zvuk pro správnou odpověď - veselý tón
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(1200, audioContext.currentTime + 0.1);
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.3);
+            }
+            
+            function playWrongSound() {
+                if (!audioContext) return;
+                
+                // Zvuk pro špatnou odpověď - klesající tón
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.3);
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.3);
+            }
+            
+            function playWinSound() {
+                if (!audioContext) return;
+                
+                // Fanfára pro výhru - sekvence tónů
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                const durations = [0.1, 0.1, 0.1, 0.3];
+                
+                notes.forEach((freq, i) => {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.type = 'sine';
+                    oscillator.frequency.value = freq;
+                    
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + (i * durations[i]));
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + ((i + 1) * durations[i]));
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.start(audioContext.currentTime + (i * durations[i]));
+                    oscillator.stop(audioContext.currentTime + ((i + 1) * durations[i]));
+                });
+            }
+            
+            let score = 0;
+            let correctCount = 0;
+            let incorrectCount = 0;
+            let currentProblem = {};
+            let startTime;
+            
+            // Inicializace výběru režimu
+            function setupModeSelection() {
+                // Přidání event listenerů pro tlačítka režimů
+                document.querySelectorAll('.mode-btn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const mode = parseInt(this.getAttribute('data-mode'));
+                        selectMode(mode);
+                    });
+                });
+                
+                // Event listener pro tlačítko "Procvičovat všechna čísla"
+                focusAllBtn.addEventListener('click', function() {
+                    focusNumber = null;
+                    // Odstranění zvýraznění u všech focus tlačítek
+                    document.querySelectorAll('.focus-btn').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                    startGame();
+                });
+            }
+            
+            // Výběr režimu
+            function selectMode(mode) {
+                currentMode = mode;
+                
+                // Nastavení režimu pro násobilku a dělení (režimy 1-5)
+                if (mode >= 1 && mode <= 5) {
+                    numbers = [...modes[mode].numbers]; // Vytvoření kopie pole
+                    
+                    // Zobrazit možnost zaměření na konkrétní číslo
+                    if (mode > 1) {
+                        focusOption.style.display = 'block';
+                        generateFocusButtons(mode);
+                    } else {
+                        focusOption.style.display = 'none';
+                        startGame();
+                    }
+                } 
+                // Režim sčítání a odčítání
+                else if (mode === 6) {
+                    focusOption.style.display = 'none';
+                    startGame();
+                }
+            }
+            
+            // Generování tlačítek pro zaměření na konkrétní číslo
+            function generateFocusButtons(mode) {
+                focusButtons.innerHTML = '';
+                
+                // Přidání tlačítka pro zaměření na poslední přidané číslo
+                const focusBtn = document.createElement('button');
+                focusBtn.className = 'focus-btn';
+                focusBtn.textContent = `Procvičovat jen číslo ${modes[mode].focus}`;
+                focusBtn.addEventListener('click', function() {
+                    document.querySelectorAll('.focus-btn').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                    focusNumber = modes[mode].focus;
+                    startGame();
+                });
+                focusButtons.appendChild(focusBtn);
+            }
+            
+            // Spuštění hry
+            function startGame() {
+                initAudio(); // Inicializace zvuku při startu hry
+                
+                // Skrytí výběru režimu a zobrazení hry
+                modeSelection.style.display = 'none';
+                gameScreen.style.display = 'block';
+                
+                // Reset skóre a statistik
+                score = 0;
+                correctCount = 0;
+                incorrectCount = 0;
+                scoreElement.textContent = score;
+                updateProgressBar();
+                
+                // Nastavení začátku času
+                startTime = new Date();
+                
+                // Generování prvního příkladu
+                generateProblem();
+            }
+            
+            function generateProblem() {
+                // Režim sčítání a odčítání do 100
+                if (currentMode === 6) {
+                    generateAddSubtractProblem();
+                    return;
+                }
+                
+                // Režim násobilky a dělení
+                // Pokud máme zaměření na konkrétní číslo, použijeme ho
+                let numbersToUse = numbers;
+                
+                // V režimu zaměření na konkrétní číslo
+                if (focusNumber !== null) {
+                    // Náhodně vybere operaci (násobilka nebo dělení)
+                    const isMultiplication = Math.random() < 0.5;
+                    
+                    if (isMultiplication) {
+                        // Pro násobilku: jedno číslo je zaměřené číslo, druhé je libovolné
+                        const otherNumber = numbers[Math.floor(Math.random() * numbers.length)];
+                        
+                        // Náhodně rozhodni, zda bude zaměřené číslo první nebo druhé
+                        if (Math.random() < 0.5) {
+                            currentProblem = {
+                                num1: focusNumber,
+                                num2: otherNumber,
+                                operation: 'x',
+                                answer: focusNumber * otherNumber
+                            };
+                        } else {
+                            currentProblem = {
+                                num1: otherNumber,
+                                num2: focusNumber,
+                                operation: 'x',
+                                answer: otherNumber * focusNumber
+                            };
+                        }
+                    } else {
+                        // Pro dělení: vždy použít zaměřené číslo jako dělitel,
+                        // a libovolné číslo * zaměřené číslo jako dělenec 
+                        const factor = numbers[Math.floor(Math.random() * numbers.length)];
+                        const num1 = factor * focusNumber;
+                        
+                        currentProblem = {
+                            num1: num1,
+                            num2: focusNumber,
+                            operation: '÷',
+                            answer: num1 / focusNumber
+                        };
+                    }
+                }
+                // Standardní režim bez zaměření
+                else {
+                    // Náhodně vybere operaci (násobilka nebo dělení)
+                    const isMultiplication = Math.random() < 0.5;
+                    
+                    if (isMultiplication) {
+                        // Násobilka
+                        const num1 = numbers[Math.floor(Math.random() * numbers.length)];
+                        const num2 = numbers[Math.floor(Math.random() * numbers.length)];
+                        
+                        currentProblem = {
+                            num1: num1,
+                            num2: num2,
+                            operation: 'x',
+                            answer: num1 * num2
+                        };
+                    } else {
+                        // Dělení (zajistíme, že výsledek bude celé číslo)
+                        let num2 = numbers[Math.floor(Math.random() * numbers.length)];
+                        let num1 = num2 * numbers[Math.floor(Math.random() * numbers.length)];
+                        
+                        currentProblem = {
+                            num1: num1,
+                            num2: num2,
+                            operation: '÷',
+                            answer: num1 / num2
+                        };
+                    }
+                }
+                
+                problemElement.textContent = `${currentProblem.num1} ${currentProblem.operation} ${currentProblem.num2} = `;
+                answerInput.value = '';
+                answerInput.focus();
+            }
+            
+            // Generování příkladu pro sčítání a odčítání do 100
+            function generateAddSubtractProblem() {
+                // Náhodně vybere operaci (sčítání nebo odčítání)
+                const isAddition = Math.random() < 0.5;
+                
+                if (isAddition) {
+                    // Sčítání
+                    const num1 = Math.floor(Math.random() * 50) + 1; // 1-50
+                    const num2 = Math.floor(Math.random() * 50) + 1; // 1-50
+                    
+                    currentProblem = {
+                        num1: num1,
+                        num2: num2,
+                        operation: '+',
+                        answer: num1 + num2
+                    };
+                } else {
+                    // Odčítání (zajistíme, že výsledek bude kladný)
+                    const num2 = Math.floor(Math.random() * 50) + 1; // 1-50
+                    const num1 = num2 + Math.floor(Math.random() * 50) + 1; // vždy větší než num2
+                    
+                    currentProblem = {
+                        num1: num1,
+                        num2: num2,
+                        operation: '-',
+                        answer: num1 - num2
+                    };
+                }
+                
+                problemElement.textContent = `${currentProblem.num1} ${currentProblem.operation} ${currentProblem.num2} = `;
+                answerInput.value = '';
+                answerInput.focus();
+            }
+            
+            function checkAnswer() {
+                const userAnswer = parseInt(answerInput.value);
+                
+                if (isNaN(userAnswer)) {
+                    feedbackElement.textContent = 'Zadej číslo!';
+                    feedbackElement.className = 'feedback incorrect';
+                    return;
+                }
+                
+                if (userAnswer === currentProblem.answer) {
+                    // Správná odpověď
+                    score++;
+                    correctCount++;
+                    feedbackElement.textContent = 'Správně!';
+                    feedbackElement.className = 'feedback correct';
+                    createCelebration();
+                    // Zvuková i vizuální zpětná vazba
+                    playCorrectSound();
+                    flashBackground('correct');
+                } else {
+                    // Špatná odpověď
+                    score = Math.max(0, score - 1);
+                    incorrectCount++;
+                    feedbackElement.textContent = `Špatně! Správná odpověď je ${currentProblem.answer}.`;
+                    feedbackElement.className = 'feedback incorrect';
+                    // Zvuková i vizuální zpětná vazba
+                    playWrongSound();
+                    flashBackground('incorrect');
+                }
+                
+                scoreElement.textContent = score;
+                updateProgressBar();
+                updateSuccessRate();
+                
+                // Kontrola, zda bylo dosaženo 50 bodů
+                if (score >= 50) {
+                    endGame();
+                } else {
+                    // Po krátké pauze generuje nový příklad
+                    setTimeout(generateProblem, 1500);
+                }
+            }
+            
+            // Funkce pro vizuální zpětnou vazbu místo zvuku
+            function flashBackground(type) {
+                const container = document.querySelector('.container');
+                const originalBackground = container.style.backgroundColor;
+                
+                if (type === 'correct') {
+                    container.style.backgroundColor = '#c8f7c5'; // Zelené pozadí při správné odpovědi
+                } else if (type === 'incorrect') {
+                    container.style.backgroundColor = '#ffcccb'; // Červené pozadí při špatné odpovědi
+                } else if (type === 'win') {
+                    container.style.backgroundColor = '#fffacd'; // Žluté pozadí při výhře
+                }
+                
+                setTimeout(() => {
+                    container.style.backgroundColor = originalBackground;
+                }, 300);
+            }
+            
+            function updateSuccessRate() {
+                const total = correctCount + incorrectCount;
+                if (total > 0) {
+                    const rate = Math.round((correctCount / total) * 100);
+                    document.getElementById('current-success-rate').textContent = `${rate}%`;
+                }
+            }
+            
+            function updateProgressBar() {
+                const progress = (score / 50) * 100;
+                progressBar.style.width = `${progress}%`;
+            }
+            
+            function createCelebration() {
+                const container = document.querySelector('.container');
+                const celebration = document.createElement('div');
+                celebration.className = 'celebration';
+                
+                // Náhodná pozice horizontálně
+                const xPos = Math.random() * 80 + 10;
+                celebration.style.left = `${xPos}%`;
+                
+                // Náhodný emotikon pro oslavu
+                const emojis = ['🎉', '⭐', '👍', '🥳', '😊', '🏆'];
+                celebration.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+                
+                container.appendChild(celebration);
+                
+                // Odstranění animace po dokončení
+                setTimeout(() => {
+                    container.removeChild(celebration);
+                }, 2000);
+            }
+            
+            function endGame() {
+                const endTime = new Date();
+                const timeSpent = Math.floor((endTime - startTime) / 1000);
+                const minutes = Math.floor(timeSpent / 60);
+                const seconds = timeSpent % 60;
+                
+                totalTimeElement.textContent = `${minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+                correctCountElement.textContent = correctCount;
+                incorrectCountElement.textContent = incorrectCount;
+                
+                // Výpočet a zobrazení úspěšnosti
+                const total = correctCount + incorrectCount;
+                if (total > 0) {
+                    const rate = Math.round((correctCount / total) * 100);
+                    document.getElementById('success-rate').textContent = `${rate}%`;
+                }
+                
+                // Vizuální efekt a zvuk
+                flashBackground('win');
+                playWinSound();
+                
+                gameScreen.style.display = 'none';
+                resultScreen.style.display = 'block';
+                
+                // Přidat extra oslavnou animaci při dokončení
+                celebrateWin();
+            }
+            
+            // Funkce pro oslavu výhry
+            function celebrateWin() {
+                const container = document.querySelector('.container');
+                
+                // Přidat několik oslavných emotikonů najednou
+                for (let i = 0; i < 20; i++) {
+                    setTimeout(() => {
+                        createCelebration();
+                    }, i * 100);
+                }
+                
+                // Pulzující efekt pro hvězdičky
+                const stars = document.querySelector('.stars');
+                stars.style.animation = 'pulse 0.7s infinite alternate';
+                
+                // Přidat animaci pulzování
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes pulse {
+                        0% { transform: scale(1); }
+                        100% { transform: scale(1.1); }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            function resetGame() {
+                // Skrytí výsledkové obrazovky
+                resultScreen.style.display = 'none';
+                // Návrat na výběr režimu
+                modeSelection.style.display = 'block';
+                gameScreen.style.display = 'none';
+                
+                // Reset zvýraznění tlačítek
+                document.querySelectorAll('.focus-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                
+                // Reset zaměření
+                focusNumber = null;
+            }
+            
+            // Event listenery
+            checkButton.addEventListener('click', function() {
+                initAudio(); // Inicializace zvuku při první interakci uživatele
+                checkAnswer();
+            });
+            
+            restartButton.addEventListener('click', resetGame);
+            
+            answerInput.addEventListener('keyup', function(event) {
+                if (event.key === 'Enter') {
+                    initAudio(); // Inicializace zvuku při první interakci uživatele
+                    checkAnswer();
+                }
+            });
+            
+            // Inicializace UI
+            setupModeSelection();
+        });
+    </script>
+</body>
+</html>
