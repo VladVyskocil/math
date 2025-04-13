@@ -498,10 +498,7 @@
                             };
                         }
                     } else {
-                        // Pro dělení: vždy použít zaměřené číslo jako dělitel,
-                        // a libovolné číslo * zaměřené číslo jako dělenec
-                        const factor = allNumbers[Math.floor(Math.random() * allNumbers.length)];
-                        
+                        // Pro dělení: vždy použít zaměřené číslo jako dělitel
                         // Vyhni se dělení nulou
                         if (focusNumber === 0) {
                             // Pokud je zaměřené číslo 0, generujeme násobení místo dělení
@@ -513,12 +510,15 @@
                                 answer: 0
                             };
                         } else {
-                            const num1 = factor * focusNumber;
+                            // Výsledek dělení musí být v rozsahu 0-10
+                            const quotient = allNumbers[Math.floor(Math.random() * allNumbers.length)];
+                            const num1 = quotient * focusNumber;
+                            
                             currentProblem = {
                                 num1: num1,
                                 num2: focusNumber,
                                 operation: '÷',
-                                answer: num1 / focusNumber
+                                answer: quotient
                             };
                         }
                     }
@@ -550,7 +550,7 @@
                             };
                         }
                     } else {
-                        // Dělení: dělitel z definovaného rozsahu, dělenec je výsledek násobení
+                        // Dělení: dělitel z definovaného rozsahu, výsledek musí být 0-10
                         const divisor = numbers[Math.floor(Math.random() * numbers.length)];
                         
                         // Vyhni se dělení nulou
@@ -564,14 +564,15 @@
                                 answer: 0
                             };
                         } else {
-                            const factor = allNumbers[Math.floor(Math.random() * allNumbers.length)];
-                            const dividend = factor * divisor;
+                            // Výsledek dělení musí být v rozsahu 0-10
+                            const quotient = allNumbers[Math.floor(Math.random() * allNumbers.length)];
+                            const dividend = quotient * divisor;
                             
                             currentProblem = {
                                 num1: dividend,
                                 num2: divisor,
                                 operation: '÷',
-                                answer: dividend / divisor
+                                answer: quotient
                             };
                         }
                     }
