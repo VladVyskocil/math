@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="cs">
 <head>
@@ -377,6 +376,14 @@
             let currentProblem = {};
             let startTime;
             
+            // Sledování jednoduchých příkladů
+            let usedEasyProblems = {
+                multiplyByOne: false,    // Násobení jedničkou
+                divideByOne: false,      // Dělení jedničkou
+                multiplyByZero: false,   // Násobení nulou
+                divideByItself: false    // Dělení čísla sebou samým
+            };
+            
             // Inicializace výběru režimu
             function setupModeSelection() {
                 // Přidání event listenerů pro tlačítka režimů
@@ -457,11 +464,40 @@
                 scoreElement.textContent = score;
                 updateProgressBar();
                 
+                // Reset jednoduchých příkladů
+                usedEasyProblems = {
+                    multiplyByOne: false,
+                    divideByOne: false,
+                    multiplyByZero: false,
+                    divideByItself: false
+                };
+                
                 // Nastavení začátku času
                 startTime = new Date();
                 
                 // Generování prvního příkladu
                 generateProblem();
+            }
+            
+            // Funkce na kontrolu, zda je příklad jednoduchý
+            function isEasyProblem(problem) {
+                // Násobení jedničkou
+                if (problem.operation === 'x' && (problem.num1 === 1 || problem.num2 === 1)) {
+                    return 'multiplyByOne';
+                }
+                // Dělení jedničkou
+                if (problem.operation === '÷' && problem.num2 === 1) {
+                    return 'divideByOne';
+                }
+                // Násobení nulou
+                if (problem.operation === 'x' && (problem.num1 === 0 || problem.num2 === 0)) {
+                    return 'multiplyByZero';
+                }
+                // Dělení čísla sebou samým (s výjimkou 0)
+                if (problem.operation === '÷' && problem.num1 === problem.num2 && problem.num1 !== 0) {
+                    return 'divideByItself';
+                }
+                return null;
             }
             
             function generateProblem() {
@@ -471,112 +507,141 @@
                     return;
                 }
                 
-                // Režim násobilky a dělení
-                // V režimu zaměření na konkrétní číslo
-                if (focusNumber !== null) {
-                    // Náhodně vybere operaci (násobilka nebo dělení)
-                    const isMultiplication = Math.random() < 0.5;
+                let attempts = 0;
+                let tempProblem;
+                let problemType;
+                
+                // Pokus o vygenerování příkladu, který není jednoduchý nebo ještě nebyl použit
+                do {
+                    attempts++;
                     
-                    if (isMultiplication) {
-                        // Pro násobilku: jedno číslo je zaměřené číslo, druhé je libovolné od 0 do 10
-                        const otherNumber = allNumbers[Math.floor(Math.random() * allNumbers.length)];
+                    // Režim násobilky a dělení
+                    // V režimu zaměření na konkrétní číslo
+                    if (focusNumber !== null) {
+                        // Náhodně vybere operaci (násobilka nebo dělení)
+                        const isMultiplication = Math.random() < 0.5;
                         
-                        // Náhodně rozhodni, zda bude zaměřené číslo první nebo druhé
-                        if (Math.random() < 0.5) {
-                            currentProblem = {
-                                num1: focusNumber,
-                                num2: otherNumber,
-                                operation: 'x',
-                                answer: focusNumber * otherNumber
-                            };
-                        } else {
-                            currentProblem = {
-                                num1: otherNumber,
-                                num2: focusNumber,
-                                operation: 'x',
-                                answer: otherNumber * focusNumber
-                            };
-                        }
-                    } else {
-                        // Pro dělení: vždy použít zaměřené číslo jako dělitel
-                        // Vyhni se dělení nulou
-                        if (focusNumber === 0) {
-                            // Pokud je zaměřené číslo 0, generujeme násobení místo dělení
-                            const randomNumber = allNumbers[Math.floor(Math.random() * allNumbers.length)];
-                            currentProblem = {
-                                num1: randomNumber,
-                                num2: 0,
-                                operation: 'x',
-                                answer: 0
-                            };
-                        } else {
-                            // Výsledek dělení musí být v rozsahu 0-10
-                            const quotient = allNumbers[Math.floor(Math.random() * allNumbers.length)];
-                            const num1 = quotient * focusNumber;
+                        if (isMultiplication) {
+                            // Pro násobilku: jedno číslo je zaměřené číslo, druhé je libovolné od 0 do 10
+                            const otherNumber = allNumbers[Math.floor(Math.random() * allNumbers.length)];
                             
-                            currentProblem = {
-                                num1: num1,
-                                num2: focusNumber,
-                                operation: '÷',
-                                answer: quotient
-                            };
+                            // Náhodně rozhodni, zda bude zaměřené číslo první nebo druhé
+                            if (Math.random() < 0.5) {
+                                tempProblem = {
+                                    num1: focusNumber,
+                                    num2: otherNumber,
+                                    operation: 'x',
+                                    answer: focusNumber * otherNumber
+                                };
+                            } else {
+                                tempProblem = {
+                                    num1: otherNumber,
+                                    num2: focusNumber,
+                                    operation: 'x',
+                                    answer: otherNumber * focusNumber
+                                };
+                            }
+                        } else {
+                            // Pro dělení: vždy použít zaměřené číslo jako dělitel
+                            // Vyhni se dělení nulou
+                            if (focusNumber === 0) {
+                                // Pokud je zaměřené číslo 0, generujeme násobení místo dělení
+                                const randomNumber = allNumbers[Math.floor(Math.random() * allNumbers.length)];
+                                tempProblem = {
+                                    num1: randomNumber,
+                                    num2: 0,
+                                    operation: 'x',
+                                    answer: 0
+                                };
+                            } else {
+                                // Výsledek dělení musí být v rozsahu 0-10
+                                const quotient = allNumbers[Math.floor(Math.random() * allNumbers.length)];
+                                const num1 = quotient * focusNumber;
+                                
+                                tempProblem = {
+                                    num1: num1,
+                                    num2: focusNumber,
+                                    operation: '÷',
+                                    answer: quotient
+                                };
+                            }
                         }
                     }
-                }
-                // Standardní režim bez zaměření
-                else {
-                    // Náhodně vybere operaci (násobilka nebo dělení)
-                    const isMultiplication = Math.random() < 0.5;
-                    
-                    if (isMultiplication) {
-                        // Násobilka: jedno číslo z definovaného rozsahu, druhé libovolné od 0 do 10
-                        const rangeNumber = numbers[Math.floor(Math.random() * numbers.length)];
-                        const otherNumber = allNumbers[Math.floor(Math.random() * allNumbers.length)];
+                    // Standardní režim bez zaměření
+                    else {
+                        // Náhodně vybere operaci (násobilka nebo dělení)
+                        const isMultiplication = Math.random() < 0.5;
                         
-                        // Náhodně rozhodni, které číslo bude z definovaného rozsahu
-                        if (Math.random() < 0.5) {
-                            currentProblem = {
-                                num1: rangeNumber,
-                                num2: otherNumber,
-                                operation: 'x',
-                                answer: rangeNumber * otherNumber
-                            };
-                        } else {
-                            currentProblem = {
-                                num1: otherNumber,
-                                num2: rangeNumber,
-                                operation: 'x',
-                                answer: otherNumber * rangeNumber
-                            };
-                        }
-                    } else {
-                        // Dělení: dělitel z definovaného rozsahu, výsledek musí být 0-10
-                        const divisor = numbers[Math.floor(Math.random() * numbers.length)];
-                        
-                        // Vyhni se dělení nulou
-                        if (divisor === 0) {
-                            // Pokud je dělitel 0, generujeme násobení místo dělení
-                            const randomNumber = allNumbers[Math.floor(Math.random() * allNumbers.length)];
-                            currentProblem = {
-                                num1: randomNumber,
-                                num2: 0,
-                                operation: 'x',
-                                answer: 0
-                            };
-                        } else {
-                            // Výsledek dělení musí být v rozsahu 0-10
-                            const quotient = allNumbers[Math.floor(Math.random() * allNumbers.length)];
-                            const dividend = quotient * divisor;
+                        if (isMultiplication) {
+                            // Násobilka: jedno číslo z definovaného rozsahu, druhé libovolné od 0 do 10
+                            const rangeNumber = numbers[Math.floor(Math.random() * numbers.length)];
+                            const otherNumber = allNumbers[Math.floor(Math.random() * allNumbers.length)];
                             
-                            currentProblem = {
-                                num1: dividend,
-                                num2: divisor,
-                                operation: '÷',
-                                answer: quotient
-                            };
+                            // Náhodně rozhodni, které číslo bude z definovaného rozsahu
+                            if (Math.random() < 0.5) {
+                                tempProblem = {
+                                    num1: rangeNumber,
+                                    num2: otherNumber,
+                                    operation: 'x',
+                                    answer: rangeNumber * otherNumber
+                                };
+                            } else {
+                                tempProblem = {
+                                    num1: otherNumber,
+                                    num2: rangeNumber,
+                                    operation: 'x',
+                                    answer: otherNumber * rangeNumber
+                                };
+                            }
+                        } else {
+                            // Dělení: dělitel z definovaného rozsahu, výsledek musí být 0-10
+                            const divisor = numbers[Math.floor(Math.random() * numbers.length)];
+                            
+                            // Vyhni se dělení nulou
+                            if (divisor === 0) {
+                                // Pokud je dělitel 0, generujeme násobení místo dělení
+                                const randomNumber = allNumbers[Math.floor(Math.random() * allNumbers.length)];
+                                tempProblem = {
+                                    num1: randomNumber,
+                                    num2: 0,
+                                    operation: 'x',
+                                    answer: 0
+                                };
+                            } else {
+                                // Výsledek dělení musí být v rozsahu 0-10
+                                const quotient = allNumbers[Math.floor(Math.random() * allNumbers.length)];
+                                const dividend = quotient * divisor;
+                                
+                                tempProblem = {
+                                    num1: dividend,
+                                    num2: divisor,
+                                    operation: '÷',
+                                    answer: quotient
+                                };
+                            }
                         }
                     }
+                    
+                    problemType = isEasyProblem(tempProblem);
+                    
+                    // Pokud je příklad jednoduchý a už byl použit, pokračuj v generování
+                    if (problemType && usedEasyProblems[problemType]) {
+                        continue;
+                    }
+                    
+                    // Pokud jsme se pokusili 15x a pořád máme jednoduchý příklad, použij ho
+                    if (attempts > 15) {
+                        break;
+                    }
+                    
+                } while (problemType && usedEasyProblems[problemType]);
+                
+                // Pokud je příklad jednoduchý, označ ho jako použitý
+                if (problemType) {
+                    usedEasyProblems[problemType] = true;
                 }
+                
+                currentProblem = tempProblem;
                 
                 problemElement.textContent = `${currentProblem.num1} ${currentProblem.operation} ${currentProblem.num2} = `;
                 answerInput.value = '';
