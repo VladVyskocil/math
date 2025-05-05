@@ -35,6 +35,8 @@
             border: 2px solid #2c80b9;
             border-radius: 10px;
             text-align: center;
+            display: block;
+            margin: 0 auto;
         }
         button {
             font-size: 20px;
@@ -155,36 +157,6 @@
             background-color: #3a7bd5;
             transform: scale(1.02);
         }
-        .focus-option {
-            margin-top: 20px;
-            padding: 15px;
-            background-color: #e9f7ff;
-            border-radius: 10px;
-        }
-        .focus-buttons {
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin: 15px 0;
-        }
-        .focus-btn {
-            font-size: 16px;
-            padding: 10px 15px;
-            background-color: #5cb85c;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        .focus-btn:hover {
-            background-color: #4cae4c;
-        }
-        .focus-btn.active {
-            background-color: #f0ad4e;
-            font-weight: bold;
-        }
     </style>
 </head>
 <body>
@@ -192,24 +164,12 @@
         <h1>Procvičování násobilky a dělení</h1>
         
         <div id="mode-selection" class="mode-selection">
-            <h1>Procvičování matematiky</h1>
             <h2>Vyber si typ příkladů:</h2>
             
             <div class="mode-options">
-                <button class="mode-btn" data-mode="1">Násobilka a dělení (1-5 a 10)</button>
-                <button class="mode-btn" data-mode="2">Násobilka a dělení (1-6 a 10)</button>
-                <button class="mode-btn" data-mode="3">Násobilka a dělení (1-7 a 10)</button>
-                <button class="mode-btn" data-mode="4">Násobilka a dělení (1-8 a 10)</button>
-                <button class="mode-btn" data-mode="5">Násobilka a dělení (1-9 a 10)</button>
-                <button class="mode-btn" data-mode="6">Sčítání a odčítání do 100</button>
-            </div>
-            
-            <div id="focus-option" class="focus-option" style="display: none;">
-                <h3>Chceš procvičovat jen konkrétní číslo?</h3>
-                <div id="focus-buttons" class="focus-buttons">
-                    <!-- Tlačítka se generují dynamicky podle výběru režimu -->
-                </div>
-                <button id="focus-all-btn" class="focus-btn">Procvičovat všechna čísla</button>
+                <button class="mode-btn" data-mode="1">Násobení a dělení od 1 do 10</button>
+                <button class="mode-btn" data-mode="2">Sčítání a odčítání do 100</button>
+                <button class="mode-btn" data-mode="3">Procvičování i/y v češtině</button>
             </div>
         </div>
         
@@ -255,9 +215,6 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const modeSelection = document.getElementById('mode-selection');
-            const focusOption = document.getElementById('focus-option');
-            const focusButtons = document.getElementById('focus-buttons');
-            const focusAllBtn = document.getElementById('focus-all-btn');
             const gameScreen = document.getElementById('game-screen');
             const problemElement = document.getElementById('problem');
             const answerInput = document.getElementById('answer');
@@ -275,20 +232,15 @@
             let audioContext;
             
             // Proměnné pro typy testů
-           // Proměnné pro typy testů
             let currentMode = 1;
-            let focusNumber = null;
-            let numbers = [1, 2, 3, 4, 5, 10]; // Výchozí čísla pro režim 1
+            let numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // Čísla pro násobilku a dělení
             let allNumbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // Všechna možná čísla
             
             // Konfigurace režimů
             const modes = {
-                1: { numbers: [1, 2, 3, 4, 5, 10], name: "Násobilka a dělení (1-5 a 10)" },
-                2: { numbers: [1, 2, 3, 4, 5, 6, 10], name: "Násobilka a dělení (1-6 a 10)", focus: 6 },
-                3: { numbers: [1, 2, 3, 4, 5, 6, 7, 10], name: "Násobilka a dělení (1-7 a 10)", focus: 7 },
-                4: { numbers: [1, 2, 3, 4, 5, 6, 7, 8, 10], name: "Násobilka a dělení (1-8 a 10)", focus: 8 },
-                5: { numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], name: "Násobilka a dělení (1-9 a 10)", focus: 9 },
-                6: { name: "Sčítání a odčítání do 100" }
+                1: { name: "Násobení a dělení od 1 do 10" },
+                2: { name: "Sčítání a odčítání do 100" },
+                3: { name: "Procvičování i/y v češtině" }
             };
             
             // Inicializace Audio Context při první interakci uživatele
@@ -393,60 +345,225 @@
                         selectMode(mode);
                     });
                 });
-                
-                // Event listener pro tlačítko "Procvičovat všechna čísla"
-                focusAllBtn.addEventListener('click', function() {
-                    focusNumber = null;
-                    // Odstranění zvýraznění u všech focus tlačítek
-                    document.querySelectorAll('.focus-btn').forEach(btn => {
-                        btn.classList.remove('active');
-                    });
-                    this.classList.add('active');
-                    startGame();
-                });
             }
             
             // Výběr režimu
             function selectMode(mode) {
                 currentMode = mode;
+                startGame();
+            }
+            
+            // Funkce pro procvičování i/y v češtině
+            function generateIYProblem() {
+                // Databáze slov pro procvičování i/y po měkkých a tvrdých souhláskách
+                const words = {
+                    // Slova s měkkými souhláskami (i)
+                    soft: [
+                        { word: "ž_to", answer: "i", fullWord: "žito", rule: "Po ž píšeme měkké i" },
+                        { word: "ž_vot", answer: "i", fullWord: "život", rule: "Po ž píšeme měkké i" },
+                        { word: "ž_vý", answer: "i", fullWord: "živý", rule: "Po ž píšeme měkké i" },
+                        { word: "ž_zeň", answer: "i", fullWord: "žízeň", rule: "Po ž píšeme měkké i" },
+                        { word: "ž_rafa", answer: "i", fullWord: "žirafa", rule: "Po ž píšeme měkké i" },
+                        { word: "š_roký", answer: "i", fullWord: "široký", rule: "Po š píšeme měkké i" },
+                        { word: "š_pka", answer: "i", fullWord: "šipka", rule: "Po š píšeme měkké i" },
+                        { word: "š_p", answer: "i", fullWord: "šíp", rule: "Po š píšeme měkké i" },
+                        { word: "š_kovný", answer: "i", fullWord: "šikovný", rule: "Po š píšeme měkké i" },
+                        { word: "š_ška", answer: "i", fullWord: "šiška", rule: "Po š píšeme měkké i" },
+                        { word: "č_stý", answer: "i", fullWord: "čistý", rule: "Po č píšeme měkké i" },
+                        { word: "č_slo", answer: "i", fullWord: "číslo", rule: "Po č píšeme měkké i" },
+                        { word: "č_lý", answer: "i", fullWord: "čilý", rule: "Po č píšeme měkké i" },
+                        { word: "č_rý", answer: "i", fullWord: "čirý", rule: "Po č píšeme měkké i" },
+                        { word: "č_perný", answer: "i", fullWord: "čiperný", rule: "Po č píšeme měkké i" },
+                        { word: "ř_dit", answer: "i", fullWord: "řídit", rule: "Po ř píšeme měkké i" },
+                        { word: "ř_dký", answer: "i", fullWord: "řídký", rule: "Po ř píšeme měkké i" },
+                        { word: "ř_jen", answer: "i", fullWord: "říjen", rule: "Po ř píšeme měkké i" },
+                        { word: "ř_kat", answer: "i", fullWord: "říkat", rule: "Po ř píšeme měkké i" },
+                        { word: "c_hla", answer: "i", fullWord: "cihla", rule: "Po c píšeme měkké i" },
+                        { word: "c_l", answer: "i", fullWord: "cíl", rule: "Po c píšeme měkké i" },
+                        { word: "c_zí", answer: "i", fullWord: "cizí", rule: "Po c píšeme měkké i" },
+                        { word: "c_bule", answer: "i", fullWord: "cibule", rule: "Po c píšeme měkké i" },
+                        { word: "c_tron", answer: "i", fullWord: "citron", rule: "Po c píšeme měkké i" },
+                        { word: "j_ndy", answer: "i", fullWord: "jindy", rule: "Po j píšeme měkké i" },
+                        { word: "j_ný", answer: "i", fullWord: "jiný", rule: "Po j píšeme měkké i" },
+                        { word: "j_st", answer: "i", fullWord: "jíst", rule: "Po j píšeme měkké i" },
+                        { word: "j_skra", answer: "i", fullWord: "jiskra", rule: "Po j píšeme měkké i" },
+                        { word: "j_zda", answer: "i", fullWord: "jízda", rule: "Po j píšeme měkké i" },
+                        { word: "d_vný", answer: "i", fullWord: "divný", rule: "Po ď píšeme měkké i" },
+                        { word: "d_tě", answer: "i", fullWord: "dítě", rule: "Po ď píšeme měkké i" },
+                        { word: "d_voký", answer: "i", fullWord: "divoký", rule: "Po ď píšeme měkké i" },
+                        { word: "d_vka", answer: "i", fullWord: "dívka", rule: "Po ď píšeme měkké i" },
+                        { word: "d_lo", answer: "i", fullWord: "dílo", rule: "Po ď píšeme měkké i" },
+                        { word: "t_síc", answer: "i", fullWord: "tisíc", rule: "Po ť píšeme měkké i" },
+                        { word: "t_cho", answer: "i", fullWord: "ticho", rule: "Po ť píšeme měkké i" },
+                        { word: "t_ha", answer: "i", fullWord: "tíha", rule: "Po ť píšeme měkké i" },
+                        { word: "t_chý", answer: "i", fullWord: "tichý", rule: "Po ť píšeme měkké i" },
+                        { word: "t_skárna", answer: "i", fullWord: "tiskárna", rule: "Po ť píšeme měkké i" },
+                        { word: "n_c", answer: "i", fullWord: "nic", rule: "Po ň píšeme měkké i" },
+                        { word: "n_kdo", answer: "i", fullWord: "nikdo", rule: "Po ň píšeme měkké i" },
+                        { word: "n_zký", answer: "i", fullWord: "nízký", rule: "Po ň píšeme měkké i" },
+                        { word: "n_tro", answer: "i", fullWord: "nitro", rule: "Po ň píšeme měkké i" },
+                        { word: "n_tka", answer: "i", fullWord: "nitka", rule: "Po ň píšeme měkké i" },
+                        { word: "č_stič", answer: "i", fullWord: "čistič", rule: "Po č píšeme měkké i" },
+                        { word: "ř_dič", answer: "i", fullWord: "řidič", rule: "Po ř píšeme měkké i" },
+                        { word: "c_zinec", answer: "i", fullWord: "cizinec", rule: "Po c píšeme měkké i" },
+                        { word: "ž_dle", answer: "i", fullWord: "židle", rule: "Po ž píšeme měkké i" },
+                        { word: "j_novatka", answer: "i", fullWord: "jinovatka", rule: "Po j píšeme měkké i" }
+                    ],
+                    // Slova s tvrdými souhláskami (y)
+                    hard: [
+                        { word: "h_giena", answer: "y", fullWord: "hygiena", rule: "Po h píšeme tvrdé y" },
+                        { word: "h_mna", answer: "y", fullWord: "hymna", rule: "Po h píšeme tvrdé y" },
+                        { word: "h_bat", answer: "y", fullWord: "hýbat", rule: "Po h píšeme tvrdé y" },
+                        { word: "h_nout", answer: "y", fullWord: "hynout", rule: "Po h píšeme tvrdé y" },
+                        { word: "h_zdit", answer: "y", fullWord: "hyzdit", rule: "Po h píšeme tvrdé y" },
+                        { word: "ch_ba", answer: "y", fullWord: "chyba", rule: "Po ch píšeme tvrdé y" },
+                        { word: "ch_tit", answer: "y", fullWord: "chytit", rule: "Po ch píšeme tvrdé y" },
+                        { word: "ch_še", answer: "y", fullWord: "chýše", rule: "Po ch píšeme tvrdé y" },
+                        { word: "ch_trý", answer: "y", fullWord: "chytrý", rule: "Po ch píšeme tvrdé y" },
+                        { word: "ch_stat", answer: "y", fullWord: "chystat", rule: "Po ch píšeme tvrdé y" },
+                        { word: "k_tka", answer: "y", fullWord: "kytka", rule: "Po k píšeme tvrdé y" },
+                        { word: "k_selý", answer: "y", fullWord: "kyselý", rule: "Po k píšeme tvrdé y" },
+                        { word: "k_vat", answer: "y", fullWord: "kývat", rule: "Po k píšeme tvrdé y" },
+                        { word: "k_slík", answer: "y", fullWord: "kyslík", rule: "Po k píšeme tvrdé y" },
+                        { word: "k_tara", answer: "y", fullWord: "kytara", rule: "Po k píšeme tvrdé y" },
+                        { word: "r_ba", answer: "y", fullWord: "ryba", rule: "Po r píšeme tvrdé y" },
+                        { word: "r_že", answer: "y", fullWord: "rýže", rule: "Po r píšeme tvrdé y" },
+                        { word: "r_ma", answer: "y", fullWord: "rýma", rule: "Po r píšeme tvrdé y" },
+                        { word: "r_chlý", answer: "y", fullWord: "rychlý", rule: "Po r píšeme tvrdé y" },
+                        { word: "r_č", answer: "y", fullWord: "rýč", rule: "Po r píšeme tvrdé y" },
+                        { word: "d_chat", answer: "y", fullWord: "dýchat", rule: "Po d píšeme tvrdé y" },
+                        { word: "d_ka", answer: "y", fullWord: "dýka", rule: "Po d píšeme tvrdé y" },
+                        { word: "d_ně", answer: "y", fullWord: "dýně", rule: "Po d píšeme tvrdé y" },
+                        { word: "d_mka", answer: "y", fullWord: "dýmka", rule: "Po d píšeme tvrdé y" },
+                        { word: "d_chavičný", answer: "y", fullWord: "dýchavičný", rule: "Po d píšeme tvrdé y" },
+                        { word: "t_č", answer: "y", fullWord: "tyč", rule: "Po t píšeme tvrdé y" },
+                        { word: "t_den", answer: "y", fullWord: "týden", rule: "Po t píšeme tvrdé y" },
+                        { word: "t_kev", answer: "y", fullWord: "tykev", rule: "Po t píšeme tvrdé y" },
+                        { word: "t_gr", answer: "y", fullWord: "tygr", rule: "Po t píšeme tvrdé y" },
+                        { word: "n_ní", answer: "y", fullWord: "nyní", rule: "Po n píšeme tvrdé y" },
+                        { word: "n_brž", answer: "y", fullWord: "nýbrž", rule: "Po n píšeme tvrdé y" },
+                        { word: "n_t", answer: "y", fullWord: "nýt", rule: "Po n píšeme tvrdé y" },
+                        { word: "n_lon", answer: "y", fullWord: "nylon", rule: "Po n píšeme tvrdé y" },
+                        { word: "h_drant", answer: "y", fullWord: "hydrant", rule: "Po h píšeme tvrdé y" },
+                        { word: "h_pnóza", answer: "y", fullWord: "hypnóza", rule: "Po h píšeme tvrdé y" },
+                        { word: "h_drolog", answer: "y", fullWord: "hydrolog", rule: "Po h píšeme tvrdé y" },
+                        { word: "k_tice", answer: "y", fullWord: "kytice", rule: "Po k píšeme tvrdé y" },
+                        { word: "k_čel", answer: "y", fullWord: "kyčel", rule: "Po k píšeme tvrdé y" },
+                        { word: "r_ngle", answer: "y", fullWord: "ryngle", rule: "Po r píšeme tvrdé y" },
+                        { word: "r_padlo", answer: "y", fullWord: "rypadlo", rule: "Po r píšeme tvrdé y" },
+                        { word: "d_namit", answer: "y", fullWord: "dynamit", rule: "Po d píšeme tvrdé y" },
+                        { word: "t_l", answer: "y", fullWord: "týl", rule: "Po t píšeme tvrdé y" },
+                        { word: "t_mián", answer: "y", fullWord: "tymián", rule: "Po t píšeme tvrdé y" },
+                        { word: "p_šný", answer: "y", fullWord: "pyšný", rule: "Po p se většinou píše tvrdé y" },
+                        { word: "m_slet", answer: "y", fullWord: "myslet", rule: "Po m píšeme většinou tvrdé y" },
+                        { word: "sm_sl", answer: "y", fullWord: "smysl", rule: "Po m píšeme většinou tvrdé y" },
+                        { word: "zm_je", answer: "y", fullWord: "zmyje", rule: "Po m píšeme většinou tvrdé y" },
+                        { word: "m_š", answer: "y", fullWord: "myš", rule: "Po m píšeme většinou tvrdé y" },
+                        { word: "hm_z", answer: "y", fullWord: "hmyz", rule: "Po m píšeme většinou tvrdé y" }
+                    ]
+                };
                 
-                // Nastavení režimu pro násobilku a dělení (režimy 1-5)
-                if (mode >= 1 && mode <= 5) {
-                    numbers = [...modes[mode].numbers]; // Vytvoření kopie pole
+                // Náhodně vybere, zda půjde o měkkou nebo tvrdou souhlásku
+                const isHard = Math.random() < 0.5;
+                const wordList = isHard ? words.hard : words.soft;
+                
+                // Náhodně vybere slovo z příslušného seznamu
+                const wordIndex = Math.floor(Math.random() * wordList.length);
+                const selectedWord = wordList[wordIndex];
+                
+                currentProblem = {
+                    word: selectedWord.word,
+                    answer: selectedWord.answer,
+                    rule: selectedWord.rule,
+                    fullWord: selectedWord.fullWord
+                };
+                
+                // Zobrazí slovo s vynechaným i/y
+                problemElement.textContent = `${currentProblem.word}`;
+                // Nastaví správnou odpověď
+                answerInput.style.display = 'none'; // Schová numerický input
+                
+                // Zkontroluje, zda již existují tlačítka pro i/y
+                let iyButtons = document.getElementById('iy-buttons');
+                if (!iyButtons) {
+                    // Vytvoří tlačítka pro volbu i/y
+                    iyButtons = document.createElement('div');
+                    iyButtons.id = 'iy-buttons';
+                    iyButtons.style.margin = '20px 0';
                     
-                    // Zobrazit možnost zaměření na konkrétní číslo
-                    if (mode > 1) {
-                        focusOption.style.display = 'block';
-                        generateFocusButtons(mode);
-                    } else {
-                        focusOption.style.display = 'none';
-                        startGame();
-                    }
-                } 
-                // Režim sčítání a odčítání
-                else if (mode === 6) {
-                    focusOption.style.display = 'none';
-                    startGame();
+                    const iButton = document.createElement('button');
+                    iButton.textContent = 'i';
+                    iButton.className = 'mode-btn';
+                    iButton.style.margin = '0 10px';
+                    iButton.style.width = '60px';
+                    iButton.style.height = '60px';
+                    iButton.style.fontSize = '24px';
+                    iButton.onclick = function() { checkIYAnswer('i'); };
+                    
+                    const yButton = document.createElement('button');
+                    yButton.textContent = 'y';
+                    yButton.className = 'mode-btn';
+                    yButton.style.margin = '0 10px';
+                    yButton.style.width = '60px';
+                    yButton.style.height = '60px';
+                    yButton.style.fontSize = '24px';
+                    yButton.onclick = function() { checkIYAnswer('y'); };
+                    
+                    iyButtons.appendChild(iButton);
+                    iyButtons.appendChild(yButton);
+                    
+                    // Vloží tlačítka do DOM
+                    const inputContainer = answerInput.parentNode;
+                    inputContainer.appendChild(iyButtons);
+                }
+                else {
+                    iyButtons.style.display = 'block';
                 }
             }
             
-            // Generování tlačítek pro zaměření na konkrétní číslo
-            function generateFocusButtons(mode) {
-                focusButtons.innerHTML = '';
+            // Funkce pro kontrolu odpovědi u i/y cvičení
+            function checkIYAnswer(userAnswer) {
+                // Porovnání pouze základního písmene (i/y), bez ohledu na délku (í/ý)
+                const correctBase = currentProblem.answer.toLowerCase().charAt(0);
+                const userBase = userAnswer.toLowerCase().charAt(0);
                 
-                // Přidání tlačítka pro zaměření na poslední přidané číslo
-                const focusBtn = document.createElement('button');
-                focusBtn.className = 'focus-btn';
-                focusBtn.textContent = `Procvičovat jen číslo ${modes[mode].focus}`;
-                focusBtn.addEventListener('click', function() {
-                    document.querySelectorAll('.focus-btn').forEach(btn => {
-                        btn.classList.remove('active');
-                    });
-                    this.classList.add('active');
-                    focusNumber = modes[mode].focus;
-                    startGame();
-                });
-                focusButtons.appendChild(focusBtn);
+                if (userBase === correctBase) {
+                    // Správná odpověď
+                    score++;
+                    correctCount++;
+                    feedbackElement.textContent = `Správně! ${currentProblem.rule}`;
+                    feedbackElement.className = 'feedback correct';
+                    createCelebration();
+                    // Zvuková i vizuální zpětná vazba
+                    playCorrectSound();
+                    flashBackground('correct');
+                } else {
+                    // Špatná odpověď
+                    score = Math.max(0, score - 1);
+                    incorrectCount++;
+                    feedbackElement.textContent = `Špatně! Správná odpověď je "${currentProblem.answer}". ${currentProblem.rule}`;
+                    feedbackElement.className = 'feedback incorrect';
+                    // Zvuková i vizuální zpětná vazba
+                    playWrongSound();
+                    flashBackground('incorrect');
+                }
+                
+                // Zobrazení celého slova
+                problemElement.textContent = `${currentProblem.fullWord}`;
+                
+                scoreElement.textContent = score;
+                updateProgressBar();
+                updateSuccessRate();
+                
+                // Kontrola, zda bylo dosaženo 50 bodů
+                if (score >= 50) {
+                    endGame();
+                } else {
+                    // Po krátké pauze generuje nový příklad
+                    setTimeout(function() {
+                        generateIYProblem();
+                    }, 1500);
+                }
             }
             
             // Spuštění hry
@@ -475,6 +592,21 @@
                 // Nastavení začátku času
                 startTime = new Date();
                 
+                // Zobrazení/skrytí ovládacích prvků podle vybraného režimu
+                if (currentMode === 3) { // Režim i/y
+                    answerInput.style.display = 'none';
+                    document.getElementById('check-btn').style.display = 'none';
+                    // Tlačítka pro i/y se vytvoří v generateIYProblem
+                } else { // Matematické režimy
+                    answerInput.style.display = 'block';
+                    document.getElementById('check-btn').style.display = 'inline-block';
+                    // Skrýt tlačítka i/y, pokud existují
+                    const iyButtons = document.getElementById('iy-buttons');
+                    if (iyButtons) {
+                        iyButtons.style.display = 'none';
+                    }
+                }
+                
                 // Generování prvního příkladu
                 generateProblem();
             }
@@ -502,8 +634,14 @@
             
             function generateProblem() {
                 // Režim sčítání a odčítání do 100
-                if (currentMode === 6) {
+                if (currentMode === 2) {
                     generateAddSubtractProblem();
+                    return;
+                }
+                
+                // Režim procvičování i/y v češtině
+                if (currentMode === 3) {
+                    generateIYProblem();
                     return;
                 }
                 
@@ -516,109 +654,55 @@
                     attempts++;
                     
                     // Režim násobilky a dělení
-                    // V režimu zaměření na konkrétní číslo
-                    if (focusNumber !== null) {
-                        // Náhodně vybere operaci (násobilka nebo dělení)
-                        const isMultiplication = Math.random() < 0.5;
+                    // Náhodně vybere operaci (násobilka nebo dělení)
+                    const isMultiplication = Math.random() < 0.5;
+                    
+                    if (isMultiplication) {
+                        // Násobilka: jedno číslo z definovaného rozsahu, druhé libovolné od 0 do 10
+                        const rangeNumber = numbers[Math.floor(Math.random() * numbers.length)];
+                        const otherNumber = allNumbers[Math.floor(Math.random() * allNumbers.length)];
                         
-                        if (isMultiplication) {
-                            // Pro násobilku: jedno číslo je zaměřené číslo, druhé je libovolné od 0 do 10
-                            const otherNumber = allNumbers[Math.floor(Math.random() * allNumbers.length)];
-                            
-                            // Náhodně rozhodni, zda bude zaměřené číslo první nebo druhé
-                            if (Math.random() < 0.5) {
-                                tempProblem = {
-                                    num1: focusNumber,
-                                    num2: otherNumber,
-                                    operation: 'x',
-                                    answer: focusNumber * otherNumber
-                                };
-                            } else {
-                                tempProblem = {
-                                    num1: otherNumber,
-                                    num2: focusNumber,
-                                    operation: 'x',
-                                    answer: otherNumber * focusNumber
-                                };
-                            }
+                        // Náhodně rozhodni, které číslo bude z definovaného rozsahu
+                        if (Math.random() < 0.5) {
+                            tempProblem = {
+                                num1: rangeNumber,
+                                num2: otherNumber,
+                                operation: 'x',
+                                answer: rangeNumber * otherNumber
+                            };
                         } else {
-                            // Pro dělení: vždy použít zaměřené číslo jako dělitel
-                            // Vyhni se dělení nulou
-                            if (focusNumber === 0) {
-                                // Pokud je zaměřené číslo 0, generujeme násobení místo dělení
-                                const randomNumber = allNumbers[Math.floor(Math.random() * allNumbers.length)];
-                                tempProblem = {
-                                    num1: randomNumber,
-                                    num2: 0,
-                                    operation: 'x',
-                                    answer: 0
-                                };
-                            } else {
-                                // Výsledek dělení musí být v rozsahu 0-10
-                                const quotient = allNumbers[Math.floor(Math.random() * allNumbers.length)];
-                                const num1 = quotient * focusNumber;
-                                
-                                tempProblem = {
-                                    num1: num1,
-                                    num2: focusNumber,
-                                    operation: '÷',
-                                    answer: quotient
-                                };
-                            }
+                            tempProblem = {
+                                num1: otherNumber,
+                                num2: rangeNumber,
+                                operation: 'x',
+                                answer: otherNumber * rangeNumber
+                            };
                         }
-                    }
-                    // Standardní režim bez zaměření
-                    else {
-                        // Náhodně vybere operaci (násobilka nebo dělení)
-                        const isMultiplication = Math.random() < 0.5;
+                    } else {
+                        // Dělení: dělitel z definovaného rozsahu, výsledek musí být 0-10
+                        const divisor = numbers[Math.floor(Math.random() * numbers.length)];
                         
-                        if (isMultiplication) {
-                            // Násobilka: jedno číslo z definovaného rozsahu, druhé libovolné od 0 do 10
-                            const rangeNumber = numbers[Math.floor(Math.random() * numbers.length)];
-                            const otherNumber = allNumbers[Math.floor(Math.random() * allNumbers.length)];
-                            
-                            // Náhodně rozhodni, které číslo bude z definovaného rozsahu
-                            if (Math.random() < 0.5) {
-                                tempProblem = {
-                                    num1: rangeNumber,
-                                    num2: otherNumber,
-                                    operation: 'x',
-                                    answer: rangeNumber * otherNumber
-                                };
-                            } else {
-                                tempProblem = {
-                                    num1: otherNumber,
-                                    num2: rangeNumber,
-                                    operation: 'x',
-                                    answer: otherNumber * rangeNumber
-                                };
-                            }
+                        // Vyhni se dělení nulou
+                        if (divisor === 0) {
+                            // Pokud je dělitel 0, generujeme násobení místo dělení
+                            const randomNumber = allNumbers[Math.floor(Math.random() * allNumbers.length)];
+                            tempProblem = {
+                                num1: randomNumber,
+                                num2: 0,
+                                operation: 'x',
+                                answer: 0
+                            };
                         } else {
-                            // Dělení: dělitel z definovaného rozsahu, výsledek musí být 0-10
-                            const divisor = numbers[Math.floor(Math.random() * numbers.length)];
+                            // Výsledek dělení musí být v rozsahu 0-10
+                            const quotient = allNumbers[Math.floor(Math.random() * allNumbers.length)];
+                            const dividend = quotient * divisor;
                             
-                            // Vyhni se dělení nulou
-                            if (divisor === 0) {
-                                // Pokud je dělitel 0, generujeme násobení místo dělení
-                                const randomNumber = allNumbers[Math.floor(Math.random() * allNumbers.length)];
-                                tempProblem = {
-                                    num1: randomNumber,
-                                    num2: 0,
-                                    operation: 'x',
-                                    answer: 0
-                                };
-                            } else {
-                                // Výsledek dělení musí být v rozsahu 0-10
-                                const quotient = allNumbers[Math.floor(Math.random() * allNumbers.length)];
-                                const dividend = quotient * divisor;
-                                
-                                tempProblem = {
-                                    num1: dividend,
-                                    num2: divisor,
-                                    operation: '÷',
-                                    answer: quotient
-                                };
-                            }
+                            tempProblem = {
+                                num1: dividend,
+                                num2: divisor,
+                                operation: '÷',
+                                answer: quotient
+                            };
                         }
                     }
                     
@@ -838,13 +922,13 @@
                 modeSelection.style.display = 'block';
                 gameScreen.style.display = 'none';
                 
-                // Reset zvýraznění tlačítek
-                document.querySelectorAll('.focus-btn').forEach(btn => {
-                    btn.classList.remove('active');
-                });
-                
-                // Reset zaměření
-                focusNumber = null;
+                // Reset UI prvků
+                answerInput.style.display = 'block';
+                document.getElementById('check-btn').style.display = 'inline-block';
+                const iyButtons = document.getElementById('iy-buttons');
+                if (iyButtons) {
+                    iyButtons.style.display = 'none';
+                }
             }
             
             // Event listenery
