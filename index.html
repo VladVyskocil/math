@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ládíkovo procvičování</title>
+    <title>Procvičování</title>
     <style>
         body {
-            font-family: 'Comic Sans MS', cursive, sans-serif;
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', cursive, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
@@ -161,7 +161,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Ládíkovo procvičování</h1>
+        <h1>Procvičování</h1>
         
         <div id="mode-selection" class="mode-selection">
             <h2>Vyber si typ příkladů:</h2>
@@ -169,7 +169,7 @@
             <div class="mode-options">
                 <button class="mode-btn" data-mode="1">Násobení a dělení</button>
                 <button class="mode-btn" data-mode="2">Sčítání a odčítání do 100</button>
-                <button class="mode-btn" data-mode="3">Procvičování i/y</button>
+                <button class="mode-btn" data-mode="3">Ubiquiti pexeso</button>
             </div>
         </div>
         
@@ -342,7 +342,11 @@
                 document.querySelectorAll('.mode-btn').forEach(button => {
                     button.addEventListener('click', function() {
                         const mode = parseInt(this.getAttribute('data-mode'));
-                        selectMode(mode);
+                        if (mode == 3) {
+                            window.open('https://vladvyskocil.github.io/ui_pexeso/', '_blank');
+                        } else {
+                          selectMode(mode);
+                        }
                     });
                 });
             }
