@@ -18,6 +18,8 @@
             border-radius: 15px;
             padding: 20px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+            position: relative; 
+            overflow: hidden; 
         }
         h1 {
             color: #2c80b9;
@@ -101,21 +103,23 @@
             transition: width 0.5s;
         }
         .celebration {
-            position: absolute;
+            position: fixed; 
+            top: -50px; 
             font-size: 30px;
             animation: fallDown 2s forwards;
             opacity: 0;
+            z-index: 1000; 
         }
         @keyframes fallDown {
             0% {
-                transform: translateY(-50px);
+                transform: translateY(0); 
                 opacity: 1;
             }
             80% {
                 opacity: 1;
             }
             100% {
-                transform: translateY(100px);
+                transform: translateY(calc(100vh + 50px)); 
                 opacity: 0;
             }
         }
@@ -126,11 +130,12 @@
             flex-wrap: wrap;
         }
         .stat-item {
-            background-color: #e9f7ff;
+            background-color: #f0f8ff; 
             padding: 10px;
             border-radius: 10px;
-            width: 45%;
+            width: calc(50% - 10px); 
             margin: 5px;
+            box-sizing: border-box;
         }
         .mode-selection {
             text-align: center;
@@ -157,6 +162,22 @@
             background-color: #3a7bd5;
             transform: scale(1.02);
         }
+         @keyframes pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+        #history-container ul {
+            padding-left: 0;
+            list-style-type: none;
+        }
+        #history-container li {
+            background-color: #f9f9f9;
+            border: 1px solid #eee;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            font-size: 14px; 
+        }
     </style>
 </head>
 <body>
@@ -180,7 +201,7 @@
             </div>
             <div class="success-rate">Úspěšnost: <span id="current-success-rate">0%</span></div>
             <div class="problem" id="problem"></div>
-            <input type="number" id="answer" placeholder="?" min="0" max="100">
+            <input type="number" id="answer" placeholder="?" min="0" max="10000"> 
             <div>
                 <button id="check-btn">Zkontrolovat</button>
             </div>
@@ -189,6 +210,7 @@
         
         <div id="result-screen" class="result-container">
             <h2>Gratuluji! Dosáhl/a jsi 50 bodů!</h2>
+            <div id="test-type-info" style="font-size: 18px; margin-bottom: 10px; color: #333;"></div>
             <div class="stars">⭐⭐⭐⭐⭐</div>
             <div class="stats">
                 <div class="stat-item">
@@ -209,6 +231,12 @@
                 </div>
             </div>
             <button id="restart-btn">Hrát znovu</button>
+            
+            <div id="history-container" style="margin-top: 30px; text-align: left; border-top: 1px solid #ccc; padding-top: 20px;">
+                <h3 style="text-align: center; color: #2c80b9;">Historie testů (posledních 10)</h3>
+                <ul id="test-history-list">
+                </ul>
+            </div>
         </div>
     </div>
 
@@ -227,542 +255,257 @@
             const correctCountElement = document.getElementById('correct-count');
             const incorrectCountElement = document.getElementById('incorrect-count');
             const totalTimeElement = document.getElementById('total-time');
+            const testTypeInfoElement = document.getElementById('test-type-info');
+            const testHistoryListElement = document.getElementById('test-history-list');
             
-            // Inicializace Web Audio API
             let audioContext;
             
-            // Proměnné pro typy testů
             let currentMode = 1;
-            let numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // Čísla pro násobilku a dělení
-            let allNumbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // Všechna možná čísla
+            const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; 
+            const allNumbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+            const multiplicationOperandsBase = [2, 3, 4, 5, 6, 7, 8, 9]; // Pro násobení bez 0, 1, 10
             
-            // Konfigurace režimů
             const modes = {
-                1: { name: "Násobení a dělení od 1 do 10" },
+                1: { name: "Násobení a dělení" },
                 2: { name: "Sčítání a odčítání do 100" },
-                3: { name: "Procvičování i/y v češtině" }
+                3: { name: "Ubiquiti pexeso" }
             };
+
+            let specialDivisionFlags; 
+            let specialMultiplicationFlags;
             
-            // Inicializace Audio Context při první interakci uživatele
+            function resetSpecialDivisionFlags() {
+                specialDivisionFlags = {
+                    dividendIsZero: false,
+                    divisorIsOne: false,  
+                    divisorIsTen: false,  
+                    divisorIsSelf: false  
+                };
+            }
+
+            function resetSpecialMultiplicationFlags() {
+                specialMultiplicationFlags = {
+                    byTenUsed: false
+                };
+            }
+            
             function initAudio() {
-                if (!audioContext) {
+                if (!audioContext && (window.AudioContext || window.webkitAudioContext)) {
                     try {
                         audioContext = new (window.AudioContext || window.webkitAudioContext)();
                     } catch (e) {
-                        console.log('Web Audio API není podporováno v tomto prohlížeči.');
+                        console.warn('Web Audio API není podporováno v tomto prohlížeči.');
+                        audioContext = null;
                     }
                 }
             }
             
-            // Funkce pro přehrání zvuků
-            function playCorrectSound() {
+            function playSound(type) {
                 if (!audioContext) return;
-                
-                // Zvuk pro správnou odpověď - veselý tón
                 const oscillator = audioContext.createOscillator();
                 const gainNode = audioContext.createGain();
-                
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(1200, audioContext.currentTime + 0.1);
-                
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-                
                 oscillator.connect(gainNode);
                 gainNode.connect(audioContext.destination);
-                
-                oscillator.start();
-                oscillator.stop(audioContext.currentTime + 0.3);
+                gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+
+                switch(type) {
+                    case 'correct':
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                        oscillator.frequency.exponentialRampToValueAtTime(1200, audioContext.currentTime + 0.1);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.25);
+                        oscillator.start();
+                        oscillator.stop(audioContext.currentTime + 0.25);
+                        break;
+                    case 'wrong':
+                        oscillator.type = 'square'; 
+                        oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
+                        oscillator.frequency.exponentialRampToValueAtTime(150, audioContext.currentTime + 0.25);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                        oscillator.start();
+                        oscillator.stop(audioContext.currentTime + 0.3);
+                        break;
+                    case 'win':
+                        const notes = [523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50]; 
+                        const durations = [0.1, 0.1, 0.1, 0.2, 0.1, 0.3];
+                        let cumulativeTime = 0;
+                        notes.forEach((freq, i) => {
+                            const noteOscillator = audioContext.createOscillator();
+                            const noteGainNode = audioContext.createGain();
+                            noteOscillator.type = 'triangle';
+                            noteOscillator.frequency.value = freq;
+                            noteGainNode.gain.setValueAtTime(0.2, audioContext.currentTime + cumulativeTime);
+                            noteGainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + cumulativeTime + durations[i]);
+                            noteOscillator.connect(noteGainNode);
+                            noteGainNode.connect(audioContext.destination);
+                            noteOscillator.start(audioContext.currentTime + cumulativeTime);
+                            noteOscillator.stop(audioContext.currentTime + cumulativeTime + durations[i]);
+                            cumulativeTime += durations[i] + 0.03; 
+                        });
+                        break;
+                }
             }
-            
-            function playWrongSound() {
-                if (!audioContext) return;
-                
-                // Zvuk pro špatnou odpověď - klesající tón
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.3);
-                
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                oscillator.start();
-                oscillator.stop(audioContext.currentTime + 0.3);
-            }
-            
-            function playWinSound() {
-                if (!audioContext) return;
-                
-                // Fanfára pro výhru - sekvence tónů
-                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
-                const durations = [0.1, 0.1, 0.1, 0.3];
-                
-                notes.forEach((freq, i) => {
-                    const oscillator = audioContext.createOscillator();
-                    const gainNode = audioContext.createGain();
                     
-                    oscillator.type = 'sine';
-                    oscillator.frequency.value = freq;
-                    
-                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + (i * durations[i]));
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + ((i + 1) * durations[i]));
-                    
-                    oscillator.connect(gainNode);
-                    gainNode.connect(audioContext.destination);
-                    
-                    oscillator.start(audioContext.currentTime + (i * durations[i]));
-                    oscillator.stop(audioContext.currentTime + ((i + 1) * durations[i]));
-                });
-            }
-            
             let score = 0;
             let correctCount = 0;
             let incorrectCount = 0;
             let currentProblem = {};
             let startTime;
-            
-            // Sledování jednoduchých příkladů
-            let usedEasyProblems = {
-                multiplyByOne: false,    // Násobení jedničkou
-                divideByOne: false,      // Dělení jedničkou
-                multiplyByZero: false,   // Násobení nulou
-                divideByItself: false    // Dělení čísla sebou samým
-            };
-            
-            // Inicializace výběru režimu
+            let sessionGeneratedProblems;
+
             function setupModeSelection() {
-                // Přidání event listenerů pro tlačítka režimů
                 document.querySelectorAll('.mode-btn').forEach(button => {
                     button.addEventListener('click', function() {
                         const mode = parseInt(this.getAttribute('data-mode'));
-                        if (mode == 3) {
+                        if (mode === 3) { 
                             window.open('https://vladvyskocil.github.io/ui_pexeso/', '_blank');
                         } else {
-                          selectMode(mode);
+                            selectMode(mode);
                         }
                     });
                 });
             }
             
-            // Výběr režimu
             function selectMode(mode) {
                 currentMode = mode;
                 startGame();
             }
             
-            // Funkce pro procvičování i/y v češtině
-            function generateIYProblem() {
-                // Databáze slov pro procvičování i/y po měkkých a tvrdých souhláskách
-                const words = {
-                    // Slova s měkkými souhláskami (i)
-                    soft: [
-                        { word: "ž_to", answer: "i", fullWord: "žito", rule: "Po ž píšeme měkké i" },
-                        { word: "ž_vot", answer: "i", fullWord: "život", rule: "Po ž píšeme měkké i" },
-                        { word: "ž_vý", answer: "i", fullWord: "živý", rule: "Po ž píšeme měkké i" },
-                        { word: "ž_zeň", answer: "i", fullWord: "žízeň", rule: "Po ž píšeme měkké i" },
-                        { word: "ž_rafa", answer: "i", fullWord: "žirafa", rule: "Po ž píšeme měkké i" },
-                        { word: "š_roký", answer: "i", fullWord: "široký", rule: "Po š píšeme měkké i" },
-                        { word: "š_pka", answer: "i", fullWord: "šipka", rule: "Po š píšeme měkké i" },
-                        { word: "š_p", answer: "i", fullWord: "šíp", rule: "Po š píšeme měkké i" },
-                        { word: "š_kovný", answer: "i", fullWord: "šikovný", rule: "Po š píšeme měkké i" },
-                        { word: "š_ška", answer: "i", fullWord: "šiška", rule: "Po š píšeme měkké i" },
-                        { word: "č_stý", answer: "i", fullWord: "čistý", rule: "Po č píšeme měkké i" },
-                        { word: "č_slo", answer: "i", fullWord: "číslo", rule: "Po č píšeme měkké i" },
-                        { word: "č_lý", answer: "i", fullWord: "čilý", rule: "Po č píšeme měkké i" },
-                        { word: "č_rý", answer: "i", fullWord: "čirý", rule: "Po č píšeme měkké i" },
-                        { word: "č_perný", answer: "i", fullWord: "čiperný", rule: "Po č píšeme měkké i" },
-                        { word: "ř_dit", answer: "i", fullWord: "řídit", rule: "Po ř píšeme měkké i" },
-                        { word: "ř_dký", answer: "i", fullWord: "řídký", rule: "Po ř píšeme měkké i" },
-                        { word: "ř_jen", answer: "i", fullWord: "říjen", rule: "Po ř píšeme měkké i" },
-                        { word: "ř_kat", answer: "i", fullWord: "říkat", rule: "Po ř píšeme měkké i" },
-                        { word: "c_hla", answer: "i", fullWord: "cihla", rule: "Po c píšeme měkké i" },
-                        { word: "c_l", answer: "i", fullWord: "cíl", rule: "Po c píšeme měkké i" },
-                        { word: "c_zí", answer: "i", fullWord: "cizí", rule: "Po c píšeme měkké i" },
-                        { word: "c_bule", answer: "i", fullWord: "cibule", rule: "Po c píšeme měkké i" },
-                        { word: "c_tron", answer: "i", fullWord: "citron", rule: "Po c píšeme měkké i" },
-                        { word: "j_ndy", answer: "i", fullWord: "jindy", rule: "Po j píšeme měkké i" },
-                        { word: "j_ný", answer: "i", fullWord: "jiný", rule: "Po j píšeme měkké i" },
-                        { word: "j_st", answer: "i", fullWord: "jíst", rule: "Po j píšeme měkké i" },
-                        { word: "j_skra", answer: "i", fullWord: "jiskra", rule: "Po j píšeme měkké i" },
-                        { word: "j_zda", answer: "i", fullWord: "jízda", rule: "Po j píšeme měkké i" },
-                        { word: "d_vný", answer: "i", fullWord: "divný", rule: "Po ď píšeme měkké i" },
-                        { word: "d_tě", answer: "i", fullWord: "dítě", rule: "Po ď píšeme měkké i" },
-                        { word: "d_voký", answer: "i", fullWord: "divoký", rule: "Po ď píšeme měkké i" },
-                        { word: "d_vka", answer: "i", fullWord: "dívka", rule: "Po ď píšeme měkké i" },
-                        { word: "d_lo", answer: "i", fullWord: "dílo", rule: "Po ď píšeme měkké i" },
-                        { word: "t_síc", answer: "i", fullWord: "tisíc", rule: "Po ť píšeme měkké i" },
-                        { word: "t_cho", answer: "i", fullWord: "ticho", rule: "Po ť píšeme měkké i" },
-                        { word: "t_ha", answer: "i", fullWord: "tíha", rule: "Po ť píšeme měkké i" },
-                        { word: "t_chý", answer: "i", fullWord: "tichý", rule: "Po ť píšeme měkké i" },
-                        { word: "t_skárna", answer: "i", fullWord: "tiskárna", rule: "Po ť píšeme měkké i" },
-                        { word: "n_c", answer: "i", fullWord: "nic", rule: "Po ň píšeme měkké i" },
-                        { word: "n_kdo", answer: "i", fullWord: "nikdo", rule: "Po ň píšeme měkké i" },
-                        { word: "n_zký", answer: "i", fullWord: "nízký", rule: "Po ň píšeme měkké i" },
-                        { word: "n_tro", answer: "i", fullWord: "nitro", rule: "Po ň píšeme měkké i" },
-                        { word: "n_tka", answer: "i", fullWord: "nitka", rule: "Po ň píšeme měkké i" },
-                        { word: "č_stič", answer: "i", fullWord: "čistič", rule: "Po č píšeme měkké i" },
-                        { word: "ř_dič", answer: "i", fullWord: "řidič", rule: "Po ř píšeme měkké i" },
-                        { word: "c_zinec", answer: "i", fullWord: "cizinec", rule: "Po c píšeme měkké i" },
-                        { word: "ž_dle", answer: "i", fullWord: "židle", rule: "Po ž píšeme měkké i" },
-                        { word: "j_novatka", answer: "i", fullWord: "jinovatka", rule: "Po j píšeme měkké i" }
-                    ],
-                    // Slova s tvrdými souhláskami (y)
-                    hard: [
-                        { word: "h_giena", answer: "y", fullWord: "hygiena", rule: "Po h píšeme tvrdé y" },
-                        { word: "h_mna", answer: "y", fullWord: "hymna", rule: "Po h píšeme tvrdé y" },
-                        { word: "h_bat", answer: "y", fullWord: "hýbat", rule: "Po h píšeme tvrdé y" },
-                        { word: "h_nout", answer: "y", fullWord: "hynout", rule: "Po h píšeme tvrdé y" },
-                        { word: "h_zdit", answer: "y", fullWord: "hyzdit", rule: "Po h píšeme tvrdé y" },
-                        { word: "ch_ba", answer: "y", fullWord: "chyba", rule: "Po ch píšeme tvrdé y" },
-                        { word: "ch_tit", answer: "y", fullWord: "chytit", rule: "Po ch píšeme tvrdé y" },
-                        { word: "ch_še", answer: "y", fullWord: "chýše", rule: "Po ch píšeme tvrdé y" },
-                        { word: "ch_trý", answer: "y", fullWord: "chytrý", rule: "Po ch píšeme tvrdé y" },
-                        { word: "ch_stat", answer: "y", fullWord: "chystat", rule: "Po ch píšeme tvrdé y" },
-                        { word: "k_tka", answer: "y", fullWord: "kytka", rule: "Po k píšeme tvrdé y" },
-                        { word: "k_selý", answer: "y", fullWord: "kyselý", rule: "Po k píšeme tvrdé y" },
-                        { word: "k_vat", answer: "y", fullWord: "kývat", rule: "Po k píšeme tvrdé y" },
-                        { word: "k_slík", answer: "y", fullWord: "kyslík", rule: "Po k píšeme tvrdé y" },
-                        { word: "k_tara", answer: "y", fullWord: "kytara", rule: "Po k píšeme tvrdé y" },
-                        { word: "r_ba", answer: "y", fullWord: "ryba", rule: "Po r píšeme tvrdé y" },
-                        { word: "r_že", answer: "y", fullWord: "rýže", rule: "Po r píšeme tvrdé y" },
-                        { word: "r_ma", answer: "y", fullWord: "rýma", rule: "Po r píšeme tvrdé y" },
-                        { word: "r_chlý", answer: "y", fullWord: "rychlý", rule: "Po r píšeme tvrdé y" },
-                        { word: "r_č", answer: "y", fullWord: "rýč", rule: "Po r píšeme tvrdé y" },
-                        { word: "d_chat", answer: "y", fullWord: "dýchat", rule: "Po d píšeme tvrdé y" },
-                        { word: "d_ka", answer: "y", fullWord: "dýka", rule: "Po d píšeme tvrdé y" },
-                        { word: "d_ně", answer: "y", fullWord: "dýně", rule: "Po d píšeme tvrdé y" },
-                        { word: "d_mka", answer: "y", fullWord: "dýmka", rule: "Po d píšeme tvrdé y" },
-                        { word: "d_chavičný", answer: "y", fullWord: "dýchavičný", rule: "Po d píšeme tvrdé y" },
-                        { word: "t_č", answer: "y", fullWord: "tyč", rule: "Po t píšeme tvrdé y" },
-                        { word: "t_den", answer: "y", fullWord: "týden", rule: "Po t píšeme tvrdé y" },
-                        { word: "t_kev", answer: "y", fullWord: "tykev", rule: "Po t píšeme tvrdé y" },
-                        { word: "t_gr", answer: "y", fullWord: "tygr", rule: "Po t píšeme tvrdé y" },
-                        { word: "n_ní", answer: "y", fullWord: "nyní", rule: "Po n píšeme tvrdé y" },
-                        { word: "n_brž", answer: "y", fullWord: "nýbrž", rule: "Po n píšeme tvrdé y" },
-                        { word: "n_t", answer: "y", fullWord: "nýt", rule: "Po n píšeme tvrdé y" },
-                        { word: "n_lon", answer: "y", fullWord: "nylon", rule: "Po n píšeme tvrdé y" },
-                        { word: "h_drant", answer: "y", fullWord: "hydrant", rule: "Po h píšeme tvrdé y" },
-                        { word: "h_pnóza", answer: "y", fullWord: "hypnóza", rule: "Po h píšeme tvrdé y" },
-                        { word: "h_drolog", answer: "y", fullWord: "hydrolog", rule: "Po h píšeme tvrdé y" },
-                        { word: "k_tice", answer: "y", fullWord: "kytice", rule: "Po k píšeme tvrdé y" },
-                        { word: "k_čel", answer: "y", fullWord: "kyčel", rule: "Po k píšeme tvrdé y" },
-                        { word: "r_ngle", answer: "y", fullWord: "ryngle", rule: "Po r píšeme tvrdé y" },
-                        { word: "r_padlo", answer: "y", fullWord: "rypadlo", rule: "Po r píšeme tvrdé y" },
-                        { word: "d_namit", answer: "y", fullWord: "dynamit", rule: "Po d píšeme tvrdé y" },
-                        { word: "t_l", answer: "y", fullWord: "týl", rule: "Po t píšeme tvrdé y" },
-                        { word: "t_mián", answer: "y", fullWord: "tymián", rule: "Po t píšeme tvrdé y" },
-                        { word: "p_šný", answer: "y", fullWord: "pyšný", rule: "Po p se většinou píše tvrdé y" },
-                        { word: "m_slet", answer: "y", fullWord: "myslet", rule: "Po m píšeme většinou tvrdé y" },
-                        { word: "sm_sl", answer: "y", fullWord: "smysl", rule: "Po m píšeme většinou tvrdé y" },
-                        { word: "zm_je", answer: "y", fullWord: "zmyje", rule: "Po m píšeme většinou tvrdé y" },
-                        { word: "m_š", answer: "y", fullWord: "myš", rule: "Po m píšeme většinou tvrdé y" },
-                        { word: "hm_z", answer: "y", fullWord: "hmyz", rule: "Po m píšeme většinou tvrdé y" }
-                    ]
-                };
-                
-                // Náhodně vybere, zda půjde o měkkou nebo tvrdou souhlásku
-                const isHard = Math.random() < 0.5;
-                const wordList = isHard ? words.hard : words.soft;
-                
-                // Náhodně vybere slovo z příslušného seznamu
-                const wordIndex = Math.floor(Math.random() * wordList.length);
-                const selectedWord = wordList[wordIndex];
-                
-                currentProblem = {
-                    word: selectedWord.word,
-                    answer: selectedWord.answer,
-                    rule: selectedWord.rule,
-                    fullWord: selectedWord.fullWord
-                };
-                
-                // Zobrazí slovo s vynechaným i/y
-                problemElement.textContent = `${currentProblem.word}`;
-                // Nastaví správnou odpověď
-                answerInput.style.display = 'none'; // Schová numerický input
-                
-                // Zkontroluje, zda již existují tlačítka pro i/y
-                let iyButtons = document.getElementById('iy-buttons');
-                if (!iyButtons) {
-                    // Vytvoří tlačítka pro volbu i/y
-                    iyButtons = document.createElement('div');
-                    iyButtons.id = 'iy-buttons';
-                    iyButtons.style.margin = '20px 0';
-                    
-                    const iButton = document.createElement('button');
-                    iButton.textContent = 'i';
-                    iButton.className = 'mode-btn';
-                    iButton.style.margin = '0 10px';
-                    iButton.style.width = '60px';
-                    iButton.style.height = '60px';
-                    iButton.style.fontSize = '24px';
-                    iButton.onclick = function() { checkIYAnswer('i'); };
-                    
-                    const yButton = document.createElement('button');
-                    yButton.textContent = 'y';
-                    yButton.className = 'mode-btn';
-                    yButton.style.margin = '0 10px';
-                    yButton.style.width = '60px';
-                    yButton.style.height = '60px';
-                    yButton.style.fontSize = '24px';
-                    yButton.onclick = function() { checkIYAnswer('y'); };
-                    
-                    iyButtons.appendChild(iButton);
-                    iyButtons.appendChild(yButton);
-                    
-                    // Vloží tlačítka do DOM
-                    const inputContainer = answerInput.parentNode;
-                    inputContainer.appendChild(iyButtons);
-                }
-                else {
-                    iyButtons.style.display = 'block';
-                }
-            }
-            
-            // Funkce pro kontrolu odpovědi u i/y cvičení
-            function checkIYAnswer(userAnswer) {
-                // Porovnání pouze základního písmene (i/y), bez ohledu na délku (í/ý)
-                const correctBase = currentProblem.answer.toLowerCase().charAt(0);
-                const userBase = userAnswer.toLowerCase().charAt(0);
-                
-                if (userBase === correctBase) {
-                    // Správná odpověď
-                    score++;
-                    correctCount++;
-                    feedbackElement.textContent = `Správně! ${currentProblem.rule}`;
-                    feedbackElement.className = 'feedback correct';
-                    createCelebration();
-                    // Zvuková i vizuální zpětná vazba
-                    playCorrectSound();
-                    flashBackground('correct');
-                } else {
-                    // Špatná odpověď
-                    score = Math.max(0, score - 1);
-                    incorrectCount++;
-                    feedbackElement.textContent = `Špatně! Správná odpověď je "${currentProblem.answer}". ${currentProblem.rule}`;
-                    feedbackElement.className = 'feedback incorrect';
-                    // Zvuková i vizuální zpětná vazba
-                    playWrongSound();
-                    flashBackground('incorrect');
-                }
-                
-                // Zobrazení celého slova
-                problemElement.textContent = `${currentProblem.fullWord}`;
-                
-                scoreElement.textContent = score;
-                updateProgressBar();
-                updateSuccessRate();
-                
-                // Kontrola, zda bylo dosaženo 50 bodů
-                if (score >= 50) {
-                    endGame();
-                } else {
-                    // Po krátké pauze generuje nový příklad
-                    setTimeout(function() {
-                        generateIYProblem();
-                    }, 1500);
-                }
-            }
-            
-            // Spuštění hry
             function startGame() {
-                initAudio(); // Inicializace zvuku při startu hry
+                if (!audioContext) initAudio();
                 
-                // Skrytí výběru režimu a zobrazení hry
                 modeSelection.style.display = 'none';
                 gameScreen.style.display = 'block';
+                resultScreen.style.display = 'none';
                 
-                // Reset skóre a statistik
                 score = 0;
                 correctCount = 0;
                 incorrectCount = 0;
                 scoreElement.textContent = score;
                 updateProgressBar();
-                
-                // Reset jednoduchých příkladů
-                usedEasyProblems = {
-                    multiplyByOne: false,
-                    divideByOne: false,
-                    multiplyByZero: false,
-                    divideByItself: false
-                };
-                
-                // Nastavení začátku času
+                updateSuccessRate(); 
+                feedbackElement.textContent = '';
+                feedbackElement.className = 'feedback';
+
+                sessionGeneratedProblems = new Set();
+                resetSpecialDivisionFlags(); 
+                resetSpecialMultiplicationFlags();
+
                 startTime = new Date();
                 
-                // Zobrazení/skrytí ovládacích prvků podle vybraného režimu
-                if (currentMode === 3) { // Režim i/y
-                    answerInput.style.display = 'none';
-                    document.getElementById('check-btn').style.display = 'none';
-                    // Tlačítka pro i/y se vytvoří v generateIYProblem
-                } else { // Matematické režimy
-                    answerInput.style.display = 'block';
-                    document.getElementById('check-btn').style.display = 'inline-block';
-                    // Skrýt tlačítka i/y, pokud existují
-                    const iyButtons = document.getElementById('iy-buttons');
-                    if (iyButtons) {
-                        iyButtons.style.display = 'none';
-                    }
-                }
+                answerInput.style.display = 'block';
+                checkButton.style.display = 'inline-block';
                 
-                // Generování prvního příkladu
                 generateProblem();
             }
             
-            // Funkce na kontrolu, zda je příklad jednoduchý
-            function isEasyProblem(problem) {
-                // Násobení jedničkou
-                if (problem.operation === 'x' && (problem.num1 === 1 || problem.num2 === 1)) {
-                    return 'multiplyByOne';
-                }
-                // Dělení jedničkou
-                if (problem.operation === '÷' && problem.num2 === 1) {
-                    return 'divideByOne';
-                }
-                // Násobení nulou
-                if (problem.operation === 'x' && (problem.num1 === 0 || problem.num2 === 0)) {
-                    return 'multiplyByZero';
-                }
-                // Dělení čísla sebou samým (s výjimkou 0)
-                if (problem.operation === '÷' && problem.num1 === problem.num2 && problem.num1 !== 0) {
-                    return 'divideByItself';
-                }
-                return null;
-            }
-            
             function generateProblem() {
-                // Režim sčítání a odčítání do 100
                 if (currentMode === 2) {
                     generateAddSubtractProblem();
                     return;
                 }
-                
-                // Režim procvičování i/y v češtině
-                if (currentMode === 3) {
-                    generateIYProblem();
-                    return;
-                }
-                
+
                 let attempts = 0;
-                let tempProblem;
-                let problemType;
-                
-                // Pokus o vygenerování příkladu, který není jednoduchý nebo ještě nebyl použit
+                const MAX_ATTEMPTS = 50; 
+                let problemGenerated = false;
+                let tempProblem = {}; // Inicializace tempProblem
+
                 do {
                     attempts++;
-                    
-                    // Režim násobilky a dělení
-                    // Náhodně vybere operaci (násobilka nebo dělení)
-                    const isMultiplication = Math.random() < 0.5;
-                    
+                    const isMultiplication = Math.random() < 0.6; 
+
                     if (isMultiplication) {
-                        // Násobilka: jedno číslo z definovaného rozsahu, druhé libovolné od 0 do 10
-                        const rangeNumber = numbers[Math.floor(Math.random() * numbers.length)];
-                        const otherNumber = allNumbers[Math.floor(Math.random() * allNumbers.length)];
+                        let num1, num2;
                         
-                        // Náhodně rozhodni, které číslo bude z definovaného rozsahu
-                        if (Math.random() < 0.5) {
-                            tempProblem = {
-                                num1: rangeNumber,
-                                num2: otherNumber,
-                                operation: 'x',
-                                answer: rangeNumber * otherNumber
-                            };
+                        if (!specialMultiplicationFlags.byTenUsed && Math.random() < 0.25) {
+                            num1 = 10;
+                            num2 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
+                            if (Math.random() < 0.5) { [num1, num2] = [num2, num1]; }
+                            tempProblem = { num1: num1, num2: num2, operation: 'x', answer: num1 * num2, triedTen: true };
                         } else {
-                            tempProblem = {
-                                num1: otherNumber,
-                                num2: rangeNumber,
-                                operation: 'x',
-                                answer: otherNumber * rangeNumber
-                            };
+                            num1 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
+                            num2 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
+                            tempProblem = { num1: num1, num2: num2, operation: 'x', answer: num1 * num2, triedTen: false };
                         }
-                    } else {
-                        // Dělení: dělitel z definovaného rozsahu, výsledek musí být 0-10
-                        const divisor = numbers[Math.floor(Math.random() * numbers.length)];
-                        
-                        // Vyhni se dělení nulou
-                        if (divisor === 0) {
-                            // Pokud je dělitel 0, generujeme násobení místo dělení
-                            const randomNumber = allNumbers[Math.floor(Math.random() * allNumbers.length)];
-                            tempProblem = {
-                                num1: randomNumber,
-                                num2: 0,
-                                operation: 'x',
-                                answer: 0
-                            };
-                        } else {
-                            // Výsledek dělení musí být v rozsahu 0-10
-                            const quotient = allNumbers[Math.floor(Math.random() * allNumbers.length)];
-                            const dividend = quotient * divisor;
+                    } else { 
+                        let divisor, quotient, dividend;
+                        let divisionTypeOk = false;
+                        let divisionAttempts = 0;
+                        const MAX_DIVISION_ATTEMPTS = 20;
+
+                        while(!divisionTypeOk && divisionAttempts < MAX_DIVISION_ATTEMPTS) {
+                            divisionAttempts++;
+                            divisor = numbers[Math.floor(Math.random() * numbers.length)]; 
+                            quotient = allNumbers[Math.floor(Math.random() * allNumbers.length)];
+                            dividend = quotient * divisor;
                             
-                            tempProblem = {
-                                num1: dividend,
-                                num2: divisor,
-                                operation: '÷',
-                                answer: quotient
-                            };
+                            tempProblem = { num1: dividend, num2: divisor, operation: '÷', answer: quotient };
+
+                            if (tempProblem.num1 === 0 && tempProblem.num2 !== 0) { 
+                                if (specialDivisionFlags.dividendIsZero && Math.random() < 0.8) continue; 
+                                divisionTypeOk = true; 
+                            } else if (tempProblem.num2 === 1) { 
+                                if (specialDivisionFlags.divisorIsOne && Math.random() < 0.8) continue;
+                                divisionTypeOk = true;
+                            } else if (tempProblem.num2 === 10) { 
+                                if (specialDivisionFlags.divisorIsTen && Math.random() < 0.8) continue;
+                                divisionTypeOk = true;
+                            } else if (tempProblem.num1 === tempProblem.num2 && tempProblem.num1 !== 0) { 
+                                if (specialDivisionFlags.divisorIsSelf && Math.random() < 0.8) continue;
+                                divisionTypeOk = true;
+                            } else { 
+                                divisionTypeOk = true;
+                            }
+                        }
+                        if (!divisionTypeOk) { 
+                            let fb_n1 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
+                            let fb_n2 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
+                            tempProblem = { num1: fb_n1, num2: fb_n2, operation: 'x', answer: fb_n1 * fb_n2, triedTen: false };
                         }
                     }
                     
-                    problemType = isEasyProblem(tempProblem);
-                    
-                    // Pokud je příklad jednoduchý a už byl použit, pokračuj v generování
-                    if (problemType && usedEasyProblems[problemType]) {
-                        continue;
+                    const problemString = `${tempProblem.num1} ${tempProblem.operation} ${tempProblem.num2}`;
+                    if (!sessionGeneratedProblems.has(problemString)) {
+                        currentProblem = { 
+                            num1: tempProblem.num1, 
+                            num2: tempProblem.num2, 
+                            operation: tempProblem.operation, 
+                            answer: tempProblem.answer 
+                        };
+                        sessionGeneratedProblems.add(problemString);
+                        problemGenerated = true;
+
+                        if (tempProblem.operation === 'x' && tempProblem.triedTen) {
+                            specialMultiplicationFlags.byTenUsed = true;
+                        }
+
+                        if (currentProblem.operation === '÷') {
+                            if (currentProblem.num1 === 0 && currentProblem.num2 !== 0) specialDivisionFlags.dividendIsZero = true;
+                            else if (currentProblem.num2 === 1) specialDivisionFlags.divisorIsOne = true;
+                            else if (currentProblem.num2 === 10) specialDivisionFlags.divisorIsTen = true;
+                            else if (currentProblem.num1 === currentProblem.num2 && currentProblem.num1 !== 0) specialDivisionFlags.divisorIsSelf = true;
+                        }
                     }
-                    
-                    // Pokud jsme se pokusili 15x a pořád máme jednoduchý příklad, použij ho
-                    if (attempts > 15) {
-                        break;
+                } while (!problemGenerated && attempts < MAX_ATTEMPTS);
+
+                if (!problemGenerated) {
+                    console.warn("Nepodařilo se vygenerovat unikátní příklad. Používám poslední vygenerovaný nebo fallback.");
+                    // Použijeme poslední 'tempProblem' pokud existuje a má operaci, jinak výchozí
+                    if (tempProblem && tempProblem.operation) {
+                         currentProblem = { num1: tempProblem.num1, num2: tempProblem.num2, operation: tempProblem.operation, answer: tempProblem.answer };
+                    } else { // Absolutní fallback
+                        let fb_n1 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
+                        let fb_n2 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
+                        currentProblem = { num1: fb_n1, num2: fb_n2, operation: 'x', answer: fb_n1 * fb_n2};
                     }
-                    
-                } while (problemType && usedEasyProblems[problemType]);
-                
-                // Pokud je příklad jednoduchý, označ ho jako použitý
-                if (problemType) {
-                    usedEasyProblems[problemType] = true;
-                }
-                
-                currentProblem = tempProblem;
-                
-                problemElement.textContent = `${currentProblem.num1} ${currentProblem.operation} ${currentProblem.num2} = `;
-                answerInput.value = '';
-                answerInput.focus();
-            }
-            
-            // Generování příkladu pro sčítání a odčítání do 100
-            function generateAddSubtractProblem() {
-                // Náhodně vybere operaci (sčítání nebo odčítání)
-                const isAddition = Math.random() < 0.5;
-                
-                if (isAddition) {
-                    // Sčítání
-                    const num1 = Math.floor(Math.random() * 50) + 1; // 1-50
-                    const num2 = Math.floor(Math.random() * 50) + 1; // 1-50
-                    
-                    currentProblem = {
-                        num1: num1,
-                        num2: num2,
-                        operation: '+',
-                        answer: num1 + num2
-                    };
-                } else {
-                    // Odčítání (zajistíme, že výsledek bude kladný)
-                    const num2 = Math.floor(Math.random() * 50) + 1; // 1-50
-                    const num1 = num2 + Math.floor(Math.random() * 50) + 1; // vždy větší než num2
-                    
-                    currentProblem = {
-                        num1: num1,
-                        num2: num2,
-                        operation: '-',
-                        answer: num1 - num2
-                    };
+                     const problemStringFallback = `${currentProblem.num1} ${currentProblem.operation} ${currentProblem.num2}`;
+                     if (!sessionGeneratedProblems.has(problemStringFallback)) {
+                         sessionGeneratedProblems.add(problemStringFallback);
+                     }
+                     // Pokud fallback byl násobení 10, musíme to také ošetřit
+                     if (currentProblem.operation === 'x' && (currentProblem.num1 === 10 || currentProblem.num2 === 10) && !specialMultiplicationFlags.byTenUsed) {
+                         specialMultiplicationFlags.byTenUsed = true;
+                     }
                 }
                 
                 problemElement.textContent = `${currentProblem.num1} ${currentProblem.operation} ${currentProblem.num2} = `;
@@ -770,8 +513,60 @@
                 answerInput.focus();
             }
             
+            function generateAddSubtractProblem() { 
+                let attempts = 0;
+                const MAX_ATTEMPTS = 50;
+                let problemGenerated = false;
+                let tempProblem;
+
+                do {
+                    attempts++;
+                    const isAddition = Math.random() < 0.5;
+                    let num1, num2;
+
+                    if (isAddition) {
+                        num1 = Math.floor(Math.random() * (89 - 11 + 1)) + 11; 
+                        const maxNum2 = 100 - num1;
+                        num2 = Math.floor(Math.random() * (maxNum2 - 11 + 1)) + 11; 
+                        tempProblem = { num1: num1, num2: num2, operation: '+', answer: num1 + num2 };
+                    } else { 
+                        num1 = Math.floor(Math.random() * (100 - 22 + 1)) + 22; 
+                        num2 = Math.floor(Math.random() * (num1 - 11 - 11 + 1)) + 11; 
+                        tempProblem = { num1: num1, num2: num2, operation: '-', answer: num1 - num2 };
+                    }
+                    
+                    const problemString = `${tempProblem.num1} ${tempProblem.operation} ${tempProblem.num2}`;
+                    if (!sessionGeneratedProblems.has(problemString)) {
+                        currentProblem = tempProblem;
+                        sessionGeneratedProblems.add(problemString);
+                        problemGenerated = true;
+                    }
+                } while (!problemGenerated && attempts < MAX_ATTEMPTS);
+                
+                if (!problemGenerated) {
+                    console.warn("Nepodařilo se vygenerovat unikátní příklad pro sčítání/odčítání.");
+                    currentProblem = tempProblem || { num1: 25, num2: 12, operation: '+', answer: 37 };
+                    const problemStringFallback = `${currentProblem.num1} ${currentProblem.operation} ${currentProblem.num2}`;
+                     if (!sessionGeneratedProblems.has(problemStringFallback)) {
+                         sessionGeneratedProblems.add(problemStringFallback);
+                     }
+                }
+
+                problemElement.textContent = `${currentProblem.num1} ${currentProblem.operation} ${currentProblem.num2} = `;
+                answerInput.value = '';
+                answerInput.focus();
+            }
+                    
             function checkAnswer() {
-                const userAnswer = parseInt(answerInput.value);
+                if (!audioContext && (score > 0 || incorrectCount > 0)) initAudio();
+
+                const userAnswerText = answerInput.value;
+                if (userAnswerText.trim() === '') {
+                    feedbackElement.textContent = 'Zadej odpověď!';
+                    feedbackElement.className = 'feedback incorrect';
+                    return;
+                }
+                const userAnswer = parseInt(userAnswerText);
                 
                 if (isNaN(userAnswer)) {
                     feedbackElement.textContent = 'Zadej číslo!';
@@ -780,23 +575,19 @@
                 }
                 
                 if (userAnswer === currentProblem.answer) {
-                    // Správná odpověď
                     score++;
                     correctCount++;
                     feedbackElement.textContent = 'Správně!';
                     feedbackElement.className = 'feedback correct';
                     createCelebration();
-                    // Zvuková i vizuální zpětná vazba
-                    playCorrectSound();
+                    playSound('correct');
                     flashBackground('correct');
                 } else {
-                    // Špatná odpověď
-                    score = Math.max(0, score - 1);
+                    score = Math.max(0, score - 1); 
                     incorrectCount++;
                     feedbackElement.textContent = `Špatně! Správná odpověď je ${currentProblem.answer}.`;
                     feedbackElement.className = 'feedback incorrect';
-                    // Zvuková i vizuální zpětná vazba
-                    playWrongSound();
+                    playSound('wrong');
                     flashBackground('incorrect');
                 }
                 
@@ -804,153 +595,184 @@
                 updateProgressBar();
                 updateSuccessRate();
                 
-                // Kontrola, zda bylo dosaženo 50 bodů
                 if (score >= 50) {
                     endGame();
                 } else {
-                    // Po krátké pauze generuje nový příklad
-                    setTimeout(generateProblem, 1500);
+                    setTimeout(generateProblem, 1200); 
                 }
             }
             
-            // Funkce pro vizuální zpětnou vazbu místo zvuku
             function flashBackground(type) {
-                const container = document.querySelector('.container');
-                const originalBackground = container.style.backgroundColor;
+                const mainContainer = document.querySelector('.container');
+                const originalBackground = mainContainer.style.backgroundColor || 'white';
                 
-                if (type === 'correct') {
-                    container.style.backgroundColor = '#c8f7c5'; // Zelené pozadí při správné odpovědi
-                } else if (type === 'incorrect') {
-                    container.style.backgroundColor = '#ffcccb'; // Červené pozadí při špatné odpovědi
-                } else if (type === 'win') {
-                    container.style.backgroundColor = '#fffacd'; // Žluté pozadí při výhře
-                }
+                if (type === 'correct') mainContainer.style.backgroundColor = '#d4edda'; 
+                else if (type === 'incorrect') mainContainer.style.backgroundColor = '#f8d7da'; 
+                else if (type === 'win') mainContainer.style.backgroundColor = '#fff3cd'; 
                 
                 setTimeout(() => {
-                    container.style.backgroundColor = originalBackground;
+                    mainContainer.style.backgroundColor = originalBackground;
                 }, 300);
             }
             
             function updateSuccessRate() {
-                const total = correctCount + incorrectCount;
-                if (total > 0) {
-                    const rate = Math.round((correctCount / total) * 100);
-                    document.getElementById('current-success-rate').textContent = `${rate}%`;
-                }
+                const totalAnswered = correctCount + incorrectCount;
+                const rate = totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0;
+                document.getElementById('current-success-rate').textContent = `${rate}%`;
             }
             
             function updateProgressBar() {
-                const progress = (score / 50) * 100;
+                const progress = Math.min((score / 50) * 100, 100);
                 progressBar.style.width = `${progress}%`;
             }
             
             function createCelebration() {
-                const container = document.querySelector('.container');
                 const celebration = document.createElement('div');
                 celebration.className = 'celebration';
-                
-                // Náhodná pozice horizontálně
-                const xPos = Math.random() * 80 + 10;
-                celebration.style.left = `${xPos}%`;
-                
-                // Náhodný emotikon pro oslavu
-                const emojis = ['🎉', '⭐', '👍', '🥳', '😊', '🏆'];
+                celebration.style.left = `${Math.random() * 90 + 5}%`; 
+                const emojis = ['🎉', '⭐', '👍', '🥳', '😊', '🏆', '✨', '🎈'];
                 celebration.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-                
-                container.appendChild(celebration);
-                
-                // Odstranění animace po dokončení
-                setTimeout(() => {
-                    container.removeChild(celebration);
-                }, 2000);
+                document.body.appendChild(celebration); 
+                setTimeout(() => { if (document.body.contains(celebration)) document.body.removeChild(celebration); }, 1900); 
             }
             
-            function endGame() {
+            function endGame() { 
                 const endTime = new Date();
                 const timeSpent = Math.floor((endTime - startTime) / 1000);
                 const minutes = Math.floor(timeSpent / 60);
                 const seconds = timeSpent % 60;
                 
-                totalTimeElement.textContent = `${minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+                const formattedTime = `${minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+                totalTimeElement.textContent = formattedTime;
                 correctCountElement.textContent = correctCount;
                 incorrectCountElement.textContent = incorrectCount;
                 
-                // Výpočet a zobrazení úspěšnosti
-                const total = correctCount + incorrectCount;
-                if (total > 0) {
-                    const rate = Math.round((correctCount / total) * 100);
-                    document.getElementById('success-rate').textContent = `${rate}%`;
-                }
+                const totalAnswered = correctCount + incorrectCount;
+                const successRateVal = totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0;
+                document.getElementById('success-rate').textContent = `${successRateVal}%`;
                 
-                // Vizuální efekt a zvuk
+                testTypeInfoElement.textContent = `Typ testu: ${modes[currentMode].name}`;
+
                 flashBackground('win');
-                playWinSound();
+                playSound('win');
                 
                 gameScreen.style.display = 'none';
                 resultScreen.style.display = 'block';
                 
-                // Přidat extra oslavnou animaci při dokončení
                 celebrateWin();
+
+                if (currentMode === 1 || currentMode === 2) { 
+                    saveTestResult(formattedTime, totalAnswered, successRateVal);
+                }
+                displayTestHistory();
+            }
+
+            function saveTestResult(duration, totalProblems, successRate) {
+                const historyKey = 'mathPracticeHistory_v2';
+                let history = [];
+                try {
+                    const storedHistory = localStorage.getItem(historyKey);
+                    if (storedHistory) history = JSON.parse(storedHistory);
+                } catch (e) {
+                    console.error("Chyba při parsování historie z localStorage: ", e);
+                    history = [];
+                }
+
+                const now = new Date();
+                const formattedDateTime = `${now.getDate()}.${now.getMonth()+1}.${now.getFullYear()} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+                const newResult = {
+                    modeName: modes[currentMode].name,
+                    dateTime: formattedDateTime,
+                    duration: duration,
+                    totalProblems: totalProblems,
+                    incorrectAnswers: incorrectCount,
+                    score: score,
+                    successRate: successRate 
+                };
+
+                history.unshift(newResult); 
+                if (history.length > 10) {
+                    history = history.slice(0, 10); 
+                }
+                try {
+                    localStorage.setItem(historyKey, JSON.stringify(history));
+                } catch (e) {
+                    console.error("Chyba při ukládání historie do localStorage: ", e);
+                }
+            }
+
+            function displayTestHistory() {
+                testHistoryListElement.innerHTML = ''; 
+                const historyKey = 'mathPracticeHistory_v2';
+                let history = [];
+                 try {
+                    const storedHistory = localStorage.getItem(historyKey);
+                    if (storedHistory) history = JSON.parse(storedHistory);
+                } catch (e) {
+                    console.error("Chyba při načítání historie z localStorage: ", e);
+                    testHistoryListElement.innerHTML = '<li>Chyba při načítání historie.</li>';
+                    return;
+                }
+
+                if (history.length === 0) {
+                    testHistoryListElement.innerHTML = '<li>Zatím žádná historie.</li>';
+                    return;
+                }
+
+                history.forEach(result => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <strong>${escapeHtml(result.modeName || '')}</strong> <span style="color: #555;">(${escapeHtml(result.dateTime || '')})</span><br>
+                        Čas: ${escapeHtml(result.duration || '')}, Příklady: ${escapeHtml(String(result.totalProblems || 0))}, 
+                        Chyby: <span style="color: ${result.incorrectAnswers > 0 ? 'red' : 'green'};">${escapeHtml(String(result.incorrectAnswers || 0))}</span>, 
+                        Skóre: ${escapeHtml(String(result.score || 0))}, Úspěšnost: ${escapeHtml(String(result.successRate || 0))}%
+                    `;
+                    testHistoryListElement.appendChild(li);
+                });
+            }
+
+            function escapeHtml(unsafe) {
+                if (typeof unsafe !== 'string') {
+                    if (unsafe === null || typeof unsafe === 'undefined') return '';
+                    if (typeof unsafe === 'number' || typeof unsafe === 'boolean') return String(unsafe);
+                    return '';
+                }
+                return unsafe
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
             }
             
-            // Funkce pro oslavu výhry
             function celebrateWin() {
-                const container = document.querySelector('.container');
+                const starsElement = document.querySelector('.stars');
+                if (starsElement) starsElement.style.animation = 'pulse 0.7s infinite alternate';
                 
-                // Přidat několik oslavných emotikonů najednou
-                for (let i = 0; i < 20; i++) {
-                    setTimeout(() => {
-                        createCelebration();
-                    }, i * 100);
+                for (let i = 0; i < 15; i++) {
+                    setTimeout(() => { createCelebration(); }, i * 100 + Math.random() * 50);
                 }
-                
-                // Pulzující efekt pro hvězdičky
-                const stars = document.querySelector('.stars');
-                stars.style.animation = 'pulse 0.7s infinite alternate';
-                
-                // Přidat animaci pulzování
-                const style = document.createElement('style');
-                style.textContent = `
-                    @keyframes pulse {
-                        0% { transform: scale(1); }
-                        100% { transform: scale(1.1); }
-                    }
-                `;
-                document.head.appendChild(style);
             }
             
             function resetGame() {
-                // Skrytí výsledkové obrazovky
                 resultScreen.style.display = 'none';
-                // Návrat na výběr režimu
                 modeSelection.style.display = 'block';
                 gameScreen.style.display = 'none';
                 
-                // Reset UI prvků
-                answerInput.style.display = 'block';
-                document.getElementById('check-btn').style.display = 'inline-block';
-                const iyButtons = document.getElementById('iy-buttons');
-                if (iyButtons) {
-                    iyButtons.style.display = 'none';
-                }
+                const starsElement = document.querySelector('.stars');
+                if (starsElement) starsElement.style.animation = '';
             }
             
-            // Event listenery
-            checkButton.addEventListener('click', function() {
-                initAudio(); // Inicializace zvuku při první interakci uživatele
-                checkAnswer();
-            });
-            
+            checkButton.addEventListener('click', checkAnswer);
             restartButton.addEventListener('click', resetGame);
             
             answerInput.addEventListener('keyup', function(event) {
                 if (event.key === 'Enter') {
-                    initAudio(); // Inicializace zvuku při první interakci uživatele
                     checkAnswer();
                 }
             });
             
-            // Inicializace UI
             setupModeSelection();
         });
     </script>
