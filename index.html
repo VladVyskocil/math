@@ -40,6 +40,10 @@
             display: block;
             margin: 0 auto;
         }
+        input[type="number"]:disabled {
+            background-color: #e9ecef;
+            opacity: 0.7;
+        }
         button {
             font-size: 20px;
             padding: 10px 20px;
@@ -53,6 +57,10 @@
         }
         button:hover {
             background-color: #1a6ea8;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
         }
         .score {
             font-size: 24px;
@@ -111,17 +119,9 @@
             z-index: 1000; 
         }
         @keyframes fallDown {
-            0% {
-                transform: translateY(0); 
-                opacity: 1;
-            }
-            80% {
-                opacity: 1;
-            }
-            100% {
-                transform: translateY(calc(100vh + 50px)); 
-                opacity: 0;
-            }
+            0% { transform: translateY(0); opacity: 1; }
+            80% { opacity: 1; }
+            100% { transform: translateY(calc(100vh + 50px)); opacity: 0; }
         }
         .stats {
             display: flex;
@@ -178,6 +178,16 @@
             border-radius: 5px;
             font-size: 14px; 
         }
+        #problem-details-table th, #problem-details-table td {
+             border: 1px solid #ddd; padding: 8px; text-align: left;
+        }
+        .toggle-details-btn {
+             margin-top: 5px; font-size: 12px; padding: 3px 6px; background-color: #5cb85c;
+        }
+        .toggle-details-btn:hover {
+            background-color: #4cae4c;
+        }
+
     </style>
 </head>
 <body>
@@ -209,33 +219,32 @@
         </div>
         
         <div id="result-screen" class="result-container">
-            <h2>Gratuluji! Dosáhl/a jsi 50 bodů!</h2>
+            <h2 id="result-title">Gratuluji! Dosáhl/a jsi 50 bodů!</h2>
             <div id="test-type-info" style="font-size: 18px; margin-bottom: 10px; color: #333;"></div>
             <div class="stars">⭐⭐⭐⭐⭐</div>
             <div class="stats">
-                <div class="stat-item">
-                    <h3>Správné odpovědi</h3>
-                    <div id="correct-count">0</div>
-                </div>
-                <div class="stat-item">
-                    <h3>Špatné odpovědi</h3>
-                    <div id="incorrect-count">0</div>
-                </div>
-                <div class="stat-item">
-                    <h3>Celkový čas</h3>
-                    <div id="total-time">0:00</div>
-                </div>
-                <div class="stat-item">
-                    <h3>Úspěšnost</h3>
-                    <div id="success-rate">0%</div>
-                </div>
+                <div class="stat-item"><h3>Správné odpovědi</h3><div id="correct-count">0</div></div>
+                <div class="stat-item"><h3>Špatné odpovědi</h3><div id="incorrect-count">0</div></div>
+                <div class="stat-item"><h3>Celkový čas</h3><div id="total-time">0:00</div></div>
+                <div class="stat-item"><h3>Úspěšnost</h3><div id="success-rate">0%</div></div>
             </div>
             <button id="restart-btn">Hrát znovu</button>
+
+            <div id="problem-details-container" style="display:none; margin-top: 30px; text-align: left; border-top: 1px solid #ccc; padding-top: 20px;">
+                <h3 style="text-align: center; color: #2c80b9;">Přehled příkladů z testu</h3>
+                <table id="problem-details-table" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th>Příklad</th><th>Tvoje odpověď</th><th>Správně?</th><th>Čas</th>
+                        </tr>
+                    </thead>
+                    <tbody id="problem-details-tbody"></tbody>
+                </table>
+            </div>
             
             <div id="history-container" style="margin-top: 30px; text-align: left; border-top: 1px solid #ccc; padding-top: 20px;">
-                <h3 style="text-align: center; color: #2c80b9;">Historie testů (posledních 10)</h3>
-                <ul id="test-history-list">
-                </ul>
+                <h3 style="text-align: center; color: #2c80b9;">Historie testů (posledních 50)</h3>
+                <ul id="test-history-list"></ul>
             </div>
         </div>
     </div>
@@ -251,19 +260,21 @@
             const scoreElement = document.getElementById('score');
             const progressBar = document.getElementById('progress-bar');
             const resultScreen = document.getElementById('result-screen');
+            const resultTitleElement = document.getElementById('result-title');
             const restartButton = document.getElementById('restart-btn');
             const correctCountElement = document.getElementById('correct-count');
             const incorrectCountElement = document.getElementById('incorrect-count');
             const totalTimeElement = document.getElementById('total-time');
             const testTypeInfoElement = document.getElementById('test-type-info');
             const testHistoryListElement = document.getElementById('test-history-list');
+            const problemDetailsContainer = document.getElementById('problem-details-container');
             
             let audioContext;
             
             let currentMode = 1;
             const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; 
             const allNumbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-            const multiplicationOperandsBase = [2, 3, 4, 5, 6, 7, 8, 9]; // Pro násobení bez 0, 1, 10
+            const multiplicationOperandsBase = [2, 3, 4, 5, 6, 7, 8, 9]; 
             
             const modes = {
                 1: { name: "Násobení a dělení" },
@@ -273,30 +284,20 @@
 
             let specialDivisionFlags; 
             let specialMultiplicationFlags;
+            let currentProblemDetails = [];
+            let problemStartTime;    
             
             function resetSpecialDivisionFlags() {
-                specialDivisionFlags = {
-                    dividendIsZero: false,
-                    divisorIsOne: false,  
-                    divisorIsTen: false,  
-                    divisorIsSelf: false  
-                };
+                specialDivisionFlags = { dividendIsZero: false, divisorIsOne: false, divisorIsTen: false, divisorIsSelf: false };
             }
-
             function resetSpecialMultiplicationFlags() {
-                specialMultiplicationFlags = {
-                    byTenUsed: false
-                };
+                specialMultiplicationFlags = { byTenUsed: false };
             }
             
             function initAudio() {
                 if (!audioContext && (window.AudioContext || window.webkitAudioContext)) {
-                    try {
-                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    } catch (e) {
-                        console.warn('Web Audio API není podporováno v tomto prohlížeči.');
-                        audioContext = null;
-                    }
+                    try { audioContext = new (window.AudioContext || window.webkitAudioContext)(); } 
+                    catch (e) { console.warn('Web Audio API není podporováno.'); audioContext = null; }
                 }
             }
             
@@ -307,39 +308,33 @@
                 oscillator.connect(gainNode);
                 gainNode.connect(audioContext.destination);
                 gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
-
                 switch(type) {
                     case 'correct':
                         oscillator.type = 'sine';
                         oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
                         oscillator.frequency.exponentialRampToValueAtTime(1200, audioContext.currentTime + 0.1);
                         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.25);
-                        oscillator.start();
-                        oscillator.stop(audioContext.currentTime + 0.25);
+                        oscillator.start(); oscillator.stop(audioContext.currentTime + 0.25);
                         break;
                     case 'wrong':
                         oscillator.type = 'square'; 
                         oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
                         oscillator.frequency.exponentialRampToValueAtTime(150, audioContext.currentTime + 0.25);
                         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-                        oscillator.start();
-                        oscillator.stop(audioContext.currentTime + 0.3);
+                        oscillator.start(); oscillator.stop(audioContext.currentTime + 0.3);
                         break;
                     case 'win':
                         const notes = [523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50]; 
                         const durations = [0.1, 0.1, 0.1, 0.2, 0.1, 0.3];
                         let cumulativeTime = 0;
                         notes.forEach((freq, i) => {
-                            const noteOscillator = audioContext.createOscillator();
-                            const noteGainNode = audioContext.createGain();
-                            noteOscillator.type = 'triangle';
-                            noteOscillator.frequency.value = freq;
-                            noteGainNode.gain.setValueAtTime(0.2, audioContext.currentTime + cumulativeTime);
-                            noteGainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + cumulativeTime + durations[i]);
-                            noteOscillator.connect(noteGainNode);
-                            noteGainNode.connect(audioContext.destination);
-                            noteOscillator.start(audioContext.currentTime + cumulativeTime);
-                            noteOscillator.stop(audioContext.currentTime + cumulativeTime + durations[i]);
+                            const o = audioContext.createOscillator(), g = audioContext.createGain();
+                            o.type = 'triangle'; o.frequency.value = freq;
+                            g.gain.setValueAtTime(0.2, audioContext.currentTime + cumulativeTime);
+                            g.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + cumulativeTime + durations[i]);
+                            o.connect(g); g.connect(audioContext.destination);
+                            o.start(audioContext.currentTime + cumulativeTime);
+                            o.stop(audioContext.currentTime + cumulativeTime + durations[i]);
                             cumulativeTime += durations[i] + 0.03; 
                         });
                         break;
@@ -357,13 +352,11 @@
                 document.querySelectorAll('.mode-btn').forEach(button => {
                     button.addEventListener('click', function() {
                         const mode = parseInt(this.getAttribute('data-mode'));
-                        if (mode === 3) { 
-                            window.open('https://vladvyskocil.github.io/ui_pexeso/', '_blank');
-                        } else {
-                            selectMode(mode);
-                        }
+                        if (mode === 3) { window.open('https://vladvyskocil.github.io/ui_pexeso/', '_blank'); } 
+                        else { selectMode(mode); }
                     });
                 });
+                displayTestHistory();
             }
             
             function selectMode(mode) {
@@ -377,85 +370,69 @@
                 modeSelection.style.display = 'none';
                 gameScreen.style.display = 'block';
                 resultScreen.style.display = 'none';
+                problemDetailsContainer.style.display = 'none';
                 
-                score = 0;
-                correctCount = 0;
-                incorrectCount = 0;
+                score = 0; correctCount = 0; incorrectCount = 0;
+                currentProblemDetails = [];
                 scoreElement.textContent = score;
-                updateProgressBar();
-                updateSuccessRate(); 
-                feedbackElement.textContent = '';
-                feedbackElement.className = 'feedback';
+                updateProgressBar(); updateSuccessRate(); 
+                feedbackElement.textContent = ''; feedbackElement.className = 'feedback';
 
                 sessionGeneratedProblems = new Set();
-                resetSpecialDivisionFlags(); 
-                resetSpecialMultiplicationFlags();
+                resetSpecialDivisionFlags(); resetSpecialMultiplicationFlags();
 
-                startTime = new Date();
-                
-                answerInput.style.display = 'block';
-                checkButton.style.display = 'inline-block';
-                
+                startTime = new Date(); 
                 generateProblem();
             }
-            
-            function generateProblem() {
-                if (currentMode === 2) {
-                    generateAddSubtractProblem();
-                    return;
-                }
 
-                let attempts = 0;
-                const MAX_ATTEMPTS = 50; 
-                let problemGenerated = false;
-                let tempProblem = {}; // Inicializace tempProblem
+            function enableControls() {
+                checkButton.disabled = false; answerInput.disabled = false;
+                answerInput.value = ''; answerInput.focus();
+            }
+            function disableControls() {
+                checkButton.disabled = true; answerInput.disabled = true;
+            }
+            
+            function generateProblemBase() {
+                 enableControls(); 
+                 problemStartTime = new Date();
+            }
+
+            function generateProblem() {
+                generateProblemBase();
+                if (currentMode === 2) { generateAddSubtractProblem(); return; }
+
+                let attempts = 0; const MAX_ATTEMPTS = 50; 
+                let problemGenerated = false; let tempProblem = {};
 
                 do {
                     attempts++;
                     const isMultiplication = Math.random() < 0.6; 
-
                     if (isMultiplication) {
                         let num1, num2;
-                        
                         if (!specialMultiplicationFlags.byTenUsed && Math.random() < 0.25) {
-                            num1 = 10;
-                            num2 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
+                            num1 = 10; num2 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
                             if (Math.random() < 0.5) { [num1, num2] = [num2, num1]; }
-                            tempProblem = { num1: num1, num2: num2, operation: 'x', answer: num1 * num2, triedTen: true };
+                            tempProblem = { num1, num2, operation: 'x', answer: num1 * num2, triedTen: true };
                         } else {
                             num1 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
                             num2 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
-                            tempProblem = { num1: num1, num2: num2, operation: 'x', answer: num1 * num2, triedTen: false };
+                            tempProblem = { num1, num2, operation: 'x', answer: num1 * num2, triedTen: false };
                         }
                     } else { 
-                        let divisor, quotient, dividend;
-                        let divisionTypeOk = false;
-                        let divisionAttempts = 0;
+                        let divisor, quotient, dividend, divisionTypeOk = false, divisionAttempts = 0;
                         const MAX_DIVISION_ATTEMPTS = 20;
-
                         while(!divisionTypeOk && divisionAttempts < MAX_DIVISION_ATTEMPTS) {
                             divisionAttempts++;
                             divisor = numbers[Math.floor(Math.random() * numbers.length)]; 
                             quotient = allNumbers[Math.floor(Math.random() * allNumbers.length)];
                             dividend = quotient * divisor;
-                            
                             tempProblem = { num1: dividend, num2: divisor, operation: '÷', answer: quotient };
-
-                            if (tempProblem.num1 === 0 && tempProblem.num2 !== 0) { 
-                                if (specialDivisionFlags.dividendIsZero && Math.random() < 0.8) continue; 
-                                divisionTypeOk = true; 
-                            } else if (tempProblem.num2 === 1) { 
-                                if (specialDivisionFlags.divisorIsOne && Math.random() < 0.8) continue;
-                                divisionTypeOk = true;
-                            } else if (tempProblem.num2 === 10) { 
-                                if (specialDivisionFlags.divisorIsTen && Math.random() < 0.8) continue;
-                                divisionTypeOk = true;
-                            } else if (tempProblem.num1 === tempProblem.num2 && tempProblem.num1 !== 0) { 
-                                if (specialDivisionFlags.divisorIsSelf && Math.random() < 0.8) continue;
-                                divisionTypeOk = true;
-                            } else { 
-                                divisionTypeOk = true;
-                            }
+                            if (tempProblem.num1 === 0 && tempProblem.num2 !== 0) { if (specialDivisionFlags.dividendIsZero && Math.random() < 0.8) continue; divisionTypeOk = true; } 
+                            else if (tempProblem.num2 === 1) { if (specialDivisionFlags.divisorIsOne && Math.random() < 0.8) continue; divisionTypeOk = true; } 
+                            else if (tempProblem.num2 === 10) { if (specialDivisionFlags.divisorIsTen && Math.random() < 0.8) continue; divisionTypeOk = true; } 
+                            else if (tempProblem.num1 === tempProblem.num2 && tempProblem.num1 !== 0) { if (specialDivisionFlags.divisorIsSelf && Math.random() < 0.8) continue; divisionTypeOk = true; } 
+                            else { divisionTypeOk = true; }
                         }
                         if (!divisionTypeOk) { 
                             let fb_n1 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
@@ -463,22 +440,11 @@
                             tempProblem = { num1: fb_n1, num2: fb_n2, operation: 'x', answer: fb_n1 * fb_n2, triedTen: false };
                         }
                     }
-                    
                     const problemString = `${tempProblem.num1} ${tempProblem.operation} ${tempProblem.num2}`;
                     if (!sessionGeneratedProblems.has(problemString)) {
-                        currentProblem = { 
-                            num1: tempProblem.num1, 
-                            num2: tempProblem.num2, 
-                            operation: tempProblem.operation, 
-                            answer: tempProblem.answer 
-                        };
-                        sessionGeneratedProblems.add(problemString);
-                        problemGenerated = true;
-
-                        if (tempProblem.operation === 'x' && tempProblem.triedTen) {
-                            specialMultiplicationFlags.byTenUsed = true;
-                        }
-
+                        currentProblem = { num1: tempProblem.num1, num2: tempProblem.num2, operation: tempProblem.operation, answer: tempProblem.answer };
+                        sessionGeneratedProblems.add(problemString); problemGenerated = true;
+                        if (tempProblem.operation === 'x' && tempProblem.triedTen) { specialMultiplicationFlags.byTenUsed = true; }
                         if (currentProblem.operation === '÷') {
                             if (currentProblem.num1 === 0 && currentProblem.num2 !== 0) specialDivisionFlags.dividendIsZero = true;
                             else if (currentProblem.num2 === 1) specialDivisionFlags.divisorIsOne = true;
@@ -489,115 +455,116 @@
                 } while (!problemGenerated && attempts < MAX_ATTEMPTS);
 
                 if (!problemGenerated) {
-                    console.warn("Nepodařilo se vygenerovat unikátní příklad. Používám poslední vygenerovaný nebo fallback.");
-                    // Použijeme poslední 'tempProblem' pokud existuje a má operaci, jinak výchozí
-                    if (tempProblem && tempProblem.operation) {
-                         currentProblem = { num1: tempProblem.num1, num2: tempProblem.num2, operation: tempProblem.operation, answer: tempProblem.answer };
-                    } else { // Absolutní fallback
-                        let fb_n1 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
-                        let fb_n2 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
-                        currentProblem = { num1: fb_n1, num2: fb_n2, operation: 'x', answer: fb_n1 * fb_n2};
-                    }
+                    console.warn("Fallback pro generování problému (násobení/dělení).");
+                    if (tempProblem && tempProblem.operation) { currentProblem = { num1: tempProblem.num1, num2: tempProblem.num2, operation: tempProblem.operation, answer: tempProblem.answer };} 
+                    else { let fb_n1 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
+                           let fb_n2 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
+                           currentProblem = { num1: fb_n1, num2: fb_n2, operation: 'x', answer: fb_n1 * fb_n2}; }
                      const problemStringFallback = `${currentProblem.num1} ${currentProblem.operation} ${currentProblem.num2}`;
-                     if (!sessionGeneratedProblems.has(problemStringFallback)) {
-                         sessionGeneratedProblems.add(problemStringFallback);
-                     }
-                     // Pokud fallback byl násobení 10, musíme to také ošetřit
-                     if (currentProblem.operation === 'x' && (currentProblem.num1 === 10 || currentProblem.num2 === 10) && !specialMultiplicationFlags.byTenUsed) {
-                         specialMultiplicationFlags.byTenUsed = true;
-                     }
+                     if (!sessionGeneratedProblems.has(problemStringFallback)) { sessionGeneratedProblems.add(problemStringFallback); }
+                     if (currentProblem.operation === 'x' && (currentProblem.num1 === 10 || currentProblem.num2 === 10) && !specialMultiplicationFlags.byTenUsed) { specialMultiplicationFlags.byTenUsed = true; }
                 }
-                
                 problemElement.textContent = `${currentProblem.num1} ${currentProblem.operation} ${currentProblem.num2} = `;
-                answerInput.value = '';
-                answerInput.focus();
             }
             
             function generateAddSubtractProblem() { 
-                let attempts = 0;
-                const MAX_ATTEMPTS = 50;
-                let problemGenerated = false;
-                let tempProblem;
-
+                generateProblemBase();
+                let attempts = 0; const MAX_ATTEMPTS = 50;
+                let problemGenerated = false; let tempProblem;
                 do {
                     attempts++;
-                    const isAddition = Math.random() < 0.5;
-                    let num1, num2;
-
+                    const isAddition = Math.random() < 0.5; let num1, num2;
                     if (isAddition) {
                         num1 = Math.floor(Math.random() * (89 - 11 + 1)) + 11; 
                         const maxNum2 = 100 - num1;
                         num2 = Math.floor(Math.random() * (maxNum2 - 11 + 1)) + 11; 
-                        tempProblem = { num1: num1, num2: num2, operation: '+', answer: num1 + num2 };
+                        tempProblem = { num1, num2, operation: '+', answer: num1 + num2 };
                     } else { 
                         num1 = Math.floor(Math.random() * (100 - 22 + 1)) + 22; 
                         num2 = Math.floor(Math.random() * (num1 - 11 - 11 + 1)) + 11; 
-                        tempProblem = { num1: num1, num2: num2, operation: '-', answer: num1 - num2 };
+                        tempProblem = { num1, num2, operation: '-', answer: num1 - num2 };
                     }
-                    
                     const problemString = `${tempProblem.num1} ${tempProblem.operation} ${tempProblem.num2}`;
                     if (!sessionGeneratedProblems.has(problemString)) {
-                        currentProblem = tempProblem;
-                        sessionGeneratedProblems.add(problemString);
-                        problemGenerated = true;
+                        currentProblem = tempProblem; sessionGeneratedProblems.add(problemString); problemGenerated = true;
                     }
                 } while (!problemGenerated && attempts < MAX_ATTEMPTS);
-                
                 if (!problemGenerated) {
-                    console.warn("Nepodařilo se vygenerovat unikátní příklad pro sčítání/odčítání.");
+                    console.warn("Fallback pro sčítání/odčítání.");
                     currentProblem = tempProblem || { num1: 25, num2: 12, operation: '+', answer: 37 };
                     const problemStringFallback = `${currentProblem.num1} ${currentProblem.operation} ${currentProblem.num2}`;
-                     if (!sessionGeneratedProblems.has(problemStringFallback)) {
-                         sessionGeneratedProblems.add(problemStringFallback);
-                     }
+                    if (!sessionGeneratedProblems.has(problemStringFallback)) { sessionGeneratedProblems.add(problemStringFallback); }
                 }
-
                 problemElement.textContent = `${currentProblem.num1} ${currentProblem.operation} ${currentProblem.num2} = `;
-                answerInput.value = '';
-                answerInput.focus();
+            }
+            
+            function formatTime(totalSeconds) {
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = Math.floor(totalSeconds % 60);
+                return `${minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
             }
                     
             function checkAnswer() {
+                disableControls(); 
+                const answerTime = new Date();
+                const timeSpentOnProblem = Math.round((answerTime - problemStartTime) / 1000); 
+
                 if (!audioContext && (score > 0 || incorrectCount > 0)) initAudio();
 
                 const userAnswerText = answerInput.value;
+                let userAnswerInt = null; 
+                let isCorrect = false;
+                const problemStringForDetails = (currentProblem && typeof currentProblem.operation !== 'undefined') 
+                                                ? `${currentProblem.num1} ${currentProblem.operation} ${currentProblem.num2} = ${currentProblem.answer}` 
+                                                : "Příklad nebyl správně načten";
+
                 if (userAnswerText.trim() === '') {
                     feedbackElement.textContent = 'Zadej odpověď!';
                     feedbackElement.className = 'feedback incorrect';
-                    return;
+                    enableControls(); // Uživatel zůstává u aktuálního příkladu
+                    return; 
                 }
-                const userAnswer = parseInt(userAnswerText);
                 
-                if (isNaN(userAnswer)) {
+                userAnswerInt = parseInt(userAnswerText);
+                
+                if (isNaN(userAnswerInt)) {
                     feedbackElement.textContent = 'Zadej číslo!';
                     feedbackElement.className = 'feedback incorrect';
+                    enableControls(); // Uživatel zůstává u aktuálního příkladu
                     return;
                 }
                 
-                if (userAnswer === currentProblem.answer) {
-                    score++;
-                    correctCount++;
-                    feedbackElement.textContent = 'Správně!';
-                    feedbackElement.className = 'feedback correct';
+                // Zpracování validní odpovědi
+                isCorrect = (userAnswerInt === currentProblem.answer);
+                currentProblemDetails.push({ problem: problemStringForDetails, userAnswer: userAnswerInt, isCorrect: isCorrect, time: timeSpentOnProblem });
+                
+                if (isCorrect) {
+                    score++; correctCount++;
+                    feedbackElement.textContent = 'Správně!'; feedbackElement.className = 'feedback correct';
                     createCelebration();
-                    playSound('correct');
-                    flashBackground('correct');
                 } else {
-                    score = Math.max(0, score - 1); 
-                    incorrectCount++;
+                    score = Math.max(0, score - 1); incorrectCount++;
                     feedbackElement.textContent = `Špatně! Správná odpověď je ${currentProblem.answer}.`;
                     feedbackElement.className = 'feedback incorrect';
-                    playSound('wrong');
-                    flashBackground('incorrect');
                 }
+                playSound(isCorrect ? 'correct' : 'wrong');
+                flashBackground(isCorrect ? 'correct' : 'incorrect');
                 
                 scoreElement.textContent = score;
-                updateProgressBar();
-                updateSuccessRate();
+                updateProgressBar(); updateSuccessRate();
+
+                // Uložit průběžný stav po každé validní odpovědi
+                if (currentMode === 1 || currentMode === 2) {
+                    const currentDuration = formatTime((new Date() - startTime) / 1000);
+                    const answeredProblemsCount = currentProblemDetails.length;
+                    // Pro průběžnou úspěšnost použijeme globální correctCount a answeredProblemsCount
+                    const currentSuccess = answeredProblemsCount > 0 ? Math.round((correctCount / answeredProblemsCount) * 100) : 0;
+                    saveTestResult(currentDuration, sessionGeneratedProblems.size, currentSuccess, false, answeredProblemsCount);
+                }
                 
-                if (score >= 50) {
-                    endGame();
-                } else {
+                if (score >= 50) { 
+                    endGame(); 
+                } else { 
                     setTimeout(generateProblem, 1200); 
                 }
             }
@@ -605,18 +572,14 @@
             function flashBackground(type) {
                 const mainContainer = document.querySelector('.container');
                 const originalBackground = mainContainer.style.backgroundColor || 'white';
-                
                 if (type === 'correct') mainContainer.style.backgroundColor = '#d4edda'; 
                 else if (type === 'incorrect') mainContainer.style.backgroundColor = '#f8d7da'; 
                 else if (type === 'win') mainContainer.style.backgroundColor = '#fff3cd'; 
-                
-                setTimeout(() => {
-                    mainContainer.style.backgroundColor = originalBackground;
-                }, 300);
+                setTimeout(() => { mainContainer.style.backgroundColor = originalBackground; }, 300);
             }
             
             function updateSuccessRate() {
-                const totalAnswered = correctCount + incorrectCount;
+                const totalAnswered = correctCount + incorrectCount; // Používáme globální pro aktuální úspěšnost v testu
                 const rate = totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0;
                 document.getElementById('current-success-rate').textContent = `${rate}%`;
             }
@@ -637,98 +600,149 @@
             }
             
             function endGame() { 
+                disableControls(); 
                 const endTime = new Date();
                 const timeSpent = Math.floor((endTime - startTime) / 1000);
-                const minutes = Math.floor(timeSpent / 60);
-                const seconds = timeSpent % 60;
+                const formattedTime = formatTime(timeSpent); 
                 
-                const formattedTime = `${minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+                resultTitleElement.textContent = score >= 50 ? "Gratuluji! Dosáhl/a jsi 50 bodů!" : "Test ukončen";
+                if (score < 50) document.querySelector('#result-screen .stars').style.display = 'none';
+                else document.querySelector('#result-screen .stars').style.display = 'block';
+
                 totalTimeElement.textContent = formattedTime;
                 correctCountElement.textContent = correctCount;
                 incorrectCountElement.textContent = incorrectCount;
                 
-                const totalAnswered = correctCount + incorrectCount;
-                const successRateVal = totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0;
+                const totalAnsweredInGame = currentProblemDetails.length;
+                const successRateVal = totalAnsweredInGame > 0 ? Math.round((correctCount / totalAnsweredInGame) * 100) : 0;
                 document.getElementById('success-rate').textContent = `${successRateVal}%`;
                 
                 testTypeInfoElement.textContent = `Typ testu: ${modes[currentMode].name}`;
 
                 flashBackground('win');
-                playSound('win');
+                if (score >= 50) playSound('win');
                 
                 gameScreen.style.display = 'none';
                 resultScreen.style.display = 'block';
                 
-                celebrateWin();
+                displayProblemDetails(); 
+                if (score >=50) celebrateWin();
 
                 if (currentMode === 1 || currentMode === 2) { 
-                    saveTestResult(formattedTime, totalAnswered, successRateVal);
+                    saveTestResult(formattedTime, sessionGeneratedProblems.size, successRateVal, score >= 50, totalAnsweredInGame);
                 }
                 displayTestHistory();
             }
 
-            function saveTestResult(duration, totalProblems, successRate) {
-                const historyKey = 'mathPracticeHistory_v2';
+            function displayProblemDetails() {
+                const tbody = document.getElementById('problem-details-tbody');
+                tbody.innerHTML = ''; 
+                currentProblemDetails.forEach(detail => {
+                    const row = tbody.insertRow();
+                    row.insertCell().textContent = detail.problem;
+                    const userAnswerCell = row.insertCell();
+                    userAnswerCell.textContent = detail.userAnswer;
+                    userAnswerCell.style.color = detail.isCorrect ? 'green' : 'red';
+                    const isCorrectCell = row.insertCell();
+                    isCorrectCell.textContent = detail.isCorrect ? 'Ano' : 'Ne';
+                    isCorrectCell.style.color = detail.isCorrect ? 'green' : 'red';
+                    row.insertCell().textContent = `${detail.time} s`;
+                });
+                problemDetailsContainer.style.display = 'block';
+            }
+
+            function saveTestResult(duration, totalProblemsGeneratedInSession, successRate, isCompleted = true, problemsAnsweredInSession = null) {
+                const historyKey = 'mathPracticeHistory_v3';
                 let history = [];
                 try {
                     const storedHistory = localStorage.getItem(historyKey);
                     if (storedHistory) history = JSON.parse(storedHistory);
-                } catch (e) {
-                    console.error("Chyba při parsování historie z localStorage: ", e);
-                    history = [];
-                }
+                } catch (e) { console.error("Chyba parsování historie: ", e); history = []; }
 
                 const now = new Date();
                 const formattedDateTime = `${now.getDate()}.${now.getMonth()+1}.${now.getFullYear()} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
 
                 const newResult = {
                     modeName: modes[currentMode].name,
-                    dateTime: formattedDateTime,
+                    startTimeEpoch: startTime.getTime(), 
+                    dateTime: formattedDateTime, 
                     duration: duration,
-                    totalProblems: totalProblems,
+                    totalProblemsGenerated: totalProblemsGeneratedInSession, 
+                    problemsAnswered: problemsAnsweredInSession !== null ? problemsAnsweredInSession : currentProblemDetails.length,
                     incorrectAnswers: incorrectCount,
                     score: score,
-                    successRate: successRate 
+                    successRate: successRate,
+                    completed: isCompleted,
+                    problemDetails: (isCompleted || (problemsAnsweredInSession !== null && problemsAnsweredInSession > 0)) ? [...currentProblemDetails] : []
                 };
 
-                history.unshift(newResult); 
-                if (history.length > 10) {
-                    history = history.slice(0, 10); 
+                let updatedExisting = false;
+                if (!isCompleted) {
+                    const existingIndex = history.findIndex(item => !item.completed && item.startTimeEpoch === startTime.getTime());
+                    if (existingIndex !== -1) {
+                        history[existingIndex] = newResult; 
+                        updatedExisting = true;
+                    }
                 }
-                try {
-                    localStorage.setItem(historyKey, JSON.stringify(history));
-                } catch (e) {
-                    console.error("Chyba při ukládání historie do localStorage: ", e);
-                }
+
+                if (!updatedExisting) { history.unshift(newResult); }
+                
+                if (history.length > 50) { history = history.slice(0, 50); }
+                
+                try { localStorage.setItem(historyKey, JSON.stringify(history)); } 
+                catch (e) { console.error("Chyba ukládání historie: ", e); }
             }
 
             function displayTestHistory() {
                 testHistoryListElement.innerHTML = ''; 
-                const historyKey = 'mathPracticeHistory_v2';
+                const historyKey = 'mathPracticeHistory_v3';
                 let history = [];
                  try {
                     const storedHistory = localStorage.getItem(historyKey);
                     if (storedHistory) history = JSON.parse(storedHistory);
-                } catch (e) {
-                    console.error("Chyba při načítání historie z localStorage: ", e);
-                    testHistoryListElement.innerHTML = '<li>Chyba při načítání historie.</li>';
-                    return;
-                }
+                } catch (e) { console.error("Chyba načítání historie: ", e); testHistoryListElement.innerHTML = '<li>Chyba.</li>'; return; }
 
-                if (history.length === 0) {
-                    testHistoryListElement.innerHTML = '<li>Zatím žádná historie.</li>';
-                    return;
-                }
+                if (history.length === 0) { testHistoryListElement.innerHTML = '<li>Zatím žádná historie.</li>'; return; }
 
-                history.forEach(result => {
+                history.forEach((result, index) => {
                     const li = document.createElement('li');
+                    let statusText = result.completed ? "Dokončen" : `Nedokončen (zodpovězeno: ${result.problemsAnswered || 0})`;
+                    
+                    let detailsHtml = '';
+                    if (result.problemDetails && result.problemDetails.length > 0) {
+                        detailsHtml = `
+                            <button class="toggle-details-btn" data-target="details-${index}">Detaily příkladů</button>
+                            <div id="details-${index}" class="problem-details-history" style="display: none; margin-top: 10px;">
+                                <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+                                    <thead><tr><th>Příklad</th><th>Odpověď</th><th>Správně?</th><th>Čas</th></tr></thead>
+                                    <tbody>
+                                        ${result.problemDetails.map(pd => `
+                                            <tr>
+                                                <td style="border:1px solid #ccc;padding:4px;">${escapeHtml(pd.problem)}</td>
+                                                <td style="border:1px solid #ccc;padding:4px;color:${pd.isCorrect?'green':'red'};">${escapeHtml(String(pd.userAnswer))}</td>
+                                                <td style="border:1px solid #ccc;padding:4px;color:${pd.isCorrect?'green':'red'};">${pd.isCorrect?'Ano':'Ne'}</td>
+                                                <td style="border:1px solid #ccc;padding:4px;">${escapeHtml(String(pd.time))} s</td>
+                                            </tr>`).join('')}
+                                    </tbody>
+                                </table>
+                            </div>`;
+                    }
                     li.innerHTML = `
-                        <strong>${escapeHtml(result.modeName || '')}</strong> <span style="color: #555;">(${escapeHtml(result.dateTime || '')})</span><br>
-                        Čas: ${escapeHtml(result.duration || '')}, Příklady: ${escapeHtml(String(result.totalProblems || 0))}, 
-                        Chyby: <span style="color: ${result.incorrectAnswers > 0 ? 'red' : 'green'};">${escapeHtml(String(result.incorrectAnswers || 0))}</span>, 
-                        Skóre: ${escapeHtml(String(result.score || 0))}, Úspěšnost: ${escapeHtml(String(result.successRate || 0))}%
-                    `;
+                        <strong>${escapeHtml(result.modeName || '')}</strong> <span style="color:#555;">(${escapeHtml(result.dateTime||'')})</span> - <span style="font-weight:bold;color:${result.completed?'green':'orange'};">${statusText}</span><br>
+                        Čas: ${escapeHtml(result.duration||'')}, Skóre: ${escapeHtml(String(result.score||0))}, Úspěšnost: ${escapeHtml(String(result.successRate||0))}%<br>
+                        Příklady (zodp./gen.): ${escapeHtml(String(result.problemsAnswered||0))}/${escapeHtml(String(result.totalProblemsGenerated||'N/A'))}, 
+                        Chyby: <span style="color:${result.incorrectAnswers>0?'red':'green'};">${escapeHtml(String(result.incorrectAnswers||0))}</span>
+                        ${detailsHtml}`;
                     testHistoryListElement.appendChild(li);
+                });
+                document.querySelectorAll('.toggle-details-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const targetDiv = document.getElementById(this.getAttribute('data-target'));
+                        if (targetDiv) {
+                            targetDiv.style.display = targetDiv.style.display === 'none' ? 'block' : 'none';
+                            this.textContent = targetDiv.style.display === 'none' ? 'Detaily příkladů' : 'Skrýt detaily';
+                        }
+                    });
                 });
             }
 
@@ -738,40 +752,26 @@
                     if (typeof unsafe === 'number' || typeof unsafe === 'boolean') return String(unsafe);
                     return '';
                 }
-                return unsafe
-                    .replace(/&/g, "&amp;")
-                    .replace(/</g, "&lt;")
-                    .replace(/>/g, "&gt;")
-                    .replace(/"/g, "&quot;")
-                    .replace(/'/g, "&#039;");
+                return unsafe.replace(/&/g,"&").replace(/</g,"<").replace(/>/g,">").replace(/"/g,"\"").replace(/'/g,"'");
             }
             
             function celebrateWin() {
                 const starsElement = document.querySelector('.stars');
                 if (starsElement) starsElement.style.animation = 'pulse 0.7s infinite alternate';
-                
-                for (let i = 0; i < 15; i++) {
-                    setTimeout(() => { createCelebration(); }, i * 100 + Math.random() * 50);
-                }
+                for (let i = 0; i < 15; i++) { setTimeout(() => { createCelebration(); }, i * 100 + Math.random() * 50); }
             }
             
             function resetGame() {
                 resultScreen.style.display = 'none';
                 modeSelection.style.display = 'block';
                 gameScreen.style.display = 'none';
-                
                 const starsElement = document.querySelector('.stars');
                 if (starsElement) starsElement.style.animation = '';
             }
             
             checkButton.addEventListener('click', checkAnswer);
             restartButton.addEventListener('click', resetGame);
-            
-            answerInput.addEventListener('keyup', function(event) {
-                if (event.key === 'Enter') {
-                    checkAnswer();
-                }
-            });
+            answerInput.addEventListener('keyup', function(event) { if (event.key === 'Enter' && !checkButton.disabled) checkAnswer(); });
             
             setupModeSelection();
         });
