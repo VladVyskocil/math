@@ -219,7 +219,7 @@
         </div>
         
         <div id="result-screen" class="result-container">
-            <h2 id="result-title">Gratuluji! Dosáhl/a jsi 50 bodů!</h2>
+            <h2 id="result-title">Gratuluji! Dosáhl/a jsi cílového počtu bodů!</h2>
             <div id="test-type-info" style="font-size: 18px; margin-bottom: 10px; color: #333;"></div>
             <div class="stars">⭐⭐⭐⭐⭐</div>
             <div class="stats">
@@ -272,13 +272,13 @@
             let audioContext;
             
             let currentMode = 1;
-            const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; 
-            const allNumbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+            const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // Pro dělitele a kvocienty
+            const allNumbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // Pro kvocienty u dělení
             const multiplicationOperandsBase = [2, 3, 4, 5, 6, 7, 8, 9]; 
             
             const modes = {
-                1: { name: "Násobení a dělení" },
-                2: { name: "Sčítání a odčítání do 100" },
+                1: { name: "Násobení a dělení", targetScore: 30 },
+                2: { name: "Sčítání a odčítání do 100", targetScore: 20 },
                 3: { name: "Ubiquiti pexeso" }
             };
 
@@ -288,7 +288,10 @@
             let problemStartTime;    
             
             function resetSpecialDivisionFlags() {
-                specialDivisionFlags = { dividendIsZero: false, divisorIsOne: false, divisorIsTen: false, divisorIsSelf: false };
+                specialDivisionFlags = { 
+                    dividendIsZero: false, 
+                    divisorIsTen: false
+                };
             }
             function resetSpecialMultiplicationFlags() {
                 specialMultiplicationFlags = { byTenUsed: false };
@@ -352,7 +355,7 @@
                 document.querySelectorAll('.mode-btn').forEach(button => {
                     button.addEventListener('click', function() {
                         const mode = parseInt(this.getAttribute('data-mode'));
-                        if (mode === 3) { window.open('https://vladvyskocil.github.io/ui_pexeso/', '_blank'); } 
+                        if (mode === 3) { window.location.href = 'https://vladvyskocil.github.io/ui_pexeso/'; } 
                         else { selectMode(mode); }
                     });
                 });
@@ -421,20 +424,34 @@
                         }
                     } else { 
                         let divisor, quotient, dividend, divisionTypeOk = false, divisionAttempts = 0;
-                        const MAX_DIVISION_ATTEMPTS = 20;
+                        const MAX_DIVISION_ATTEMPTS = 30; // Zvýšen počet pokusů kvůli omezením
                         while(!divisionTypeOk && divisionAttempts < MAX_DIVISION_ATTEMPTS) {
                             divisionAttempts++;
-                            divisor = numbers[Math.floor(Math.random() * numbers.length)]; 
+                            // Dělitel z 2-10 (vynecháváme 1)
+                            let possibleDivisors = numbers.filter(n => n > 1); 
+                            divisor = possibleDivisors[Math.floor(Math.random() * possibleDivisors.length)];
+                            
                             quotient = allNumbers[Math.floor(Math.random() * allNumbers.length)];
                             dividend = quotient * divisor;
+                            
+                            // Kontrola explicitně zakázaných dělení
+                            if (divisor === 1) { divisionTypeOk = false; continue; } // Nemělo by nastat kvůli filtrování `possibleDivisors`
+                            if (dividend === divisor && dividend !== 0) { divisionTypeOk = false; continue; } // X / X
+
                             tempProblem = { num1: dividend, num2: divisor, operation: '÷', answer: quotient };
-                            if (tempProblem.num1 === 0 && tempProblem.num2 !== 0) { if (specialDivisionFlags.dividendIsZero && Math.random() < 0.8) continue; divisionTypeOk = true; } 
-                            else if (tempProblem.num2 === 1) { if (specialDivisionFlags.divisorIsOne && Math.random() < 0.8) continue; divisionTypeOk = true; } 
-                            else if (tempProblem.num2 === 10) { if (specialDivisionFlags.divisorIsTen && Math.random() < 0.8) continue; divisionTypeOk = true; } 
-                            else if (tempProblem.num1 === tempProblem.num2 && tempProblem.num1 !== 0) { if (specialDivisionFlags.divisorIsSelf && Math.random() < 0.8) continue; divisionTypeOk = true; } 
-                            else { divisionTypeOk = true; }
+
+                            if (tempProblem.num1 === 0 && tempProblem.num2 !== 0) { 
+                                if (specialDivisionFlags.dividendIsZero && Math.random() < 0.8) continue; 
+                                divisionTypeOk = true; 
+                            } else if (tempProblem.num2 === 10) { 
+                                if (specialDivisionFlags.divisorIsTen && Math.random() < 0.8) continue;
+                                divisionTypeOk = true;
+                            } else { // Ostatní povolená dělení (dělitel 2-9)
+                                divisionTypeOk = true;
+                            }
                         }
                         if (!divisionTypeOk) { 
+                            // Fallback na násobení, pokud se nepodaří vygenerovat validní dělení
                             let fb_n1 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
                             let fb_n2 = multiplicationOperandsBase[Math.floor(Math.random() * multiplicationOperandsBase.length)];
                             tempProblem = { num1: fb_n1, num2: fb_n2, operation: 'x', answer: fb_n1 * fb_n2, triedTen: false };
@@ -447,9 +464,7 @@
                         if (tempProblem.operation === 'x' && tempProblem.triedTen) { specialMultiplicationFlags.byTenUsed = true; }
                         if (currentProblem.operation === '÷') {
                             if (currentProblem.num1 === 0 && currentProblem.num2 !== 0) specialDivisionFlags.dividendIsZero = true;
-                            else if (currentProblem.num2 === 1) specialDivisionFlags.divisorIsOne = true;
                             else if (currentProblem.num2 === 10) specialDivisionFlags.divisorIsTen = true;
-                            else if (currentProblem.num1 === currentProblem.num2 && currentProblem.num1 !== 0) specialDivisionFlags.divisorIsSelf = true;
                         }
                     }
                 } while (!problemGenerated && attempts < MAX_ATTEMPTS);
@@ -521,7 +536,7 @@
                 if (userAnswerText.trim() === '') {
                     feedbackElement.textContent = 'Zadej odpověď!';
                     feedbackElement.className = 'feedback incorrect';
-                    enableControls(); // Uživatel zůstává u aktuálního příkladu
+                    enableControls();
                     return; 
                 }
                 
@@ -530,11 +545,10 @@
                 if (isNaN(userAnswerInt)) {
                     feedbackElement.textContent = 'Zadej číslo!';
                     feedbackElement.className = 'feedback incorrect';
-                    enableControls(); // Uživatel zůstává u aktuálního příkladu
+                    enableControls();
                     return;
                 }
                 
-                // Zpracování validní odpovědi
                 isCorrect = (userAnswerInt === currentProblem.answer);
                 currentProblemDetails.push({ problem: problemStringForDetails, userAnswer: userAnswerInt, isCorrect: isCorrect, time: timeSpentOnProblem });
                 
@@ -553,16 +567,15 @@
                 scoreElement.textContent = score;
                 updateProgressBar(); updateSuccessRate();
 
-                // Uložit průběžný stav po každé validní odpovědi
                 if (currentMode === 1 || currentMode === 2) {
                     const currentDuration = formatTime((new Date() - startTime) / 1000);
                     const answeredProblemsCount = currentProblemDetails.length;
-                    // Pro průběžnou úspěšnost použijeme globální correctCount a answeredProblemsCount
                     const currentSuccess = answeredProblemsCount > 0 ? Math.round((correctCount / answeredProblemsCount) * 100) : 0;
                     saveTestResult(currentDuration, sessionGeneratedProblems.size, currentSuccess, false, answeredProblemsCount);
                 }
                 
-                if (score >= 50) { 
+                const targetScoreForMode = modes[currentMode]?.targetScore;
+                if (targetScoreForMode && score >= targetScoreForMode) { 
                     endGame(); 
                 } else { 
                     setTimeout(generateProblem, 1200); 
@@ -579,13 +592,14 @@
             }
             
             function updateSuccessRate() {
-                const totalAnswered = correctCount + incorrectCount; // Používáme globální pro aktuální úspěšnost v testu
+                const totalAnswered = correctCount + incorrectCount;
                 const rate = totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0;
                 document.getElementById('current-success-rate').textContent = `${rate}%`;
             }
             
             function updateProgressBar() {
-                const progress = Math.min((score / 50) * 100, 100);
+                const targetScore = modes[currentMode]?.targetScore || 30; // Default na 30, pokud není specifikováno
+                const progress = Math.min((score / targetScore) * 100, 100);
                 progressBar.style.width = `${progress}%`;
             }
             
@@ -605,9 +619,16 @@
                 const timeSpent = Math.floor((endTime - startTime) / 1000);
                 const formattedTime = formatTime(timeSpent); 
                 
-                resultTitleElement.textContent = score >= 50 ? "Gratuluji! Dosáhl/a jsi 50 bodů!" : "Test ukončen";
-                if (score < 50) document.querySelector('#result-screen .stars').style.display = 'none';
-                else document.querySelector('#result-screen .stars').style.display = 'block';
+                const targetScoreForMode = modes[currentMode]?.targetScore || (currentMode === 1 ? 30 : 20);
+                if (score >= targetScoreForMode) {
+                    resultTitleElement.textContent = `Gratuluji! Dosáhl/a jsi ${targetScoreForMode} bodů!`;
+                    document.querySelector('#result-screen .stars').style.display = 'block';
+                    playSound('win'); 
+                    celebrateWin();
+                } else { 
+                    resultTitleElement.textContent = "Test ukončen"; // Pro případ, že by se volalo endGame z jiného důvodu
+                    document.querySelector('#result-screen .stars').style.display = 'none';
+                }
 
                 totalTimeElement.textContent = formattedTime;
                 correctCountElement.textContent = correctCount;
@@ -620,16 +641,14 @@
                 testTypeInfoElement.textContent = `Typ testu: ${modes[currentMode].name}`;
 
                 flashBackground('win');
-                if (score >= 50) playSound('win');
                 
                 gameScreen.style.display = 'none';
                 resultScreen.style.display = 'block';
                 
                 displayProblemDetails(); 
-                if (score >=50) celebrateWin();
 
                 if (currentMode === 1 || currentMode === 2) { 
-                    saveTestResult(formattedTime, sessionGeneratedProblems.size, successRateVal, score >= 50, totalAnsweredInGame);
+                    saveTestResult(formattedTime, sessionGeneratedProblems.size, successRateVal, score >= targetScoreForMode, totalAnsweredInGame);
                 }
                 displayTestHistory();
             }
@@ -706,6 +725,10 @@
 
                 history.forEach((result, index) => {
                     const li = document.createElement('li');
+                    let targetScoreText = "";
+                    if (result.modeName === modes[1].name) targetScoreText = ` (cíl: ${modes[1].targetScore}b)`;
+                    else if (result.modeName === modes[2].name) targetScoreText = ` (cíl: ${modes[2].targetScore}b)`;
+
                     let statusText = result.completed ? "Dokončen" : `Nedokončen (zodpovězeno: ${result.problemsAnswered || 0})`;
                     
                     let detailsHtml = '';
@@ -728,7 +751,7 @@
                             </div>`;
                     }
                     li.innerHTML = `
-                        <strong>${escapeHtml(result.modeName || '')}</strong> <span style="color:#555;">(${escapeHtml(result.dateTime||'')})</span> - <span style="font-weight:bold;color:${result.completed?'green':'orange'};">${statusText}</span><br>
+                        <strong>${escapeHtml(result.modeName || '')}${targetScoreText}</strong> <span style="color:#555;">(${escapeHtml(result.dateTime||'')})</span> - <span style="font-weight:bold;color:${result.completed?'green':'orange'};">${statusText}</span><br>
                         Čas: ${escapeHtml(result.duration||'')}, Skóre: ${escapeHtml(String(result.score||0))}, Úspěšnost: ${escapeHtml(String(result.successRate||0))}%<br>
                         Příklady (zodp./gen.): ${escapeHtml(String(result.problemsAnswered||0))}/${escapeHtml(String(result.totalProblemsGenerated||'N/A'))}, 
                         Chyby: <span style="color:${result.incorrectAnswers>0?'red':'green'};">${escapeHtml(String(result.incorrectAnswers||0))}</span>
